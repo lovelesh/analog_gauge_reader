@@ -138,3 +138,5 @@ yolov8?-seg.pt
 .vscode/
 **/runs
 **/data
+/input
+/results
