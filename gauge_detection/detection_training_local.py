@@ -2,20 +2,21 @@ from ultralytics import YOLO
 import os
 
 
+
 def train_yolo_model(task, data_file, model):
 
     training_epochs = 20
     plots = True
     conf = 0.5  # confidence threshold yolo
-    export_format = "onnx"
-    # imgsz = 1024
+    export_format = "ncnn"
+    # imgsz = 448   # Train for default image sizes
 
     model.train(task=task,
                 data=data_file,
                 plots=plots,
                 epochs=training_epochs,
+                # imgsz=imgsz,
                 conf=conf)
-                # imgsz=imgsz)
     metrics = model.val()
     print(metrics.box.map)  # mAP50-95
     print(metrics.box.map50)  # mAP50
@@ -26,7 +27,7 @@ def train_yolo_model(task, data_file, model):
 
 def predict_yolo_model(task, source_file_path, model):
 
-    image_size = 1024
+    # image_size = 448  # infer for default image size
     visualize = False
     show = False
     save = True
@@ -64,12 +65,13 @@ if __name__ == "__main__":
     # segmentation_model_name = "yolov8n-seg.pt"
     # segmentation_model = YOLO(segmentation_model_name)
     
-    segmentation_inference_model_file_path = "runs/segment/train2/weights/best.onnx"
-    segmentation_inference_data_path = "data/segmentation/test/images"
-    segmentation_model = YOLO(segmentation_inference_model_file_path)
+    # segmentation_inference_model_file_path = "runs/segment/train2/weights/best.onnx"
+    # segmentation_inference_data_path = "data/segmentation/test/images"
+    # segmentation_model = YOLO(segmentation_inference_model_file_path)
 
     # Train the detection model
     # train_yolo_model('segment', segmentation_data_file, segmentation_model)
 
     # test the detection model
-    predict_yolo_model('segment', segmentation_inference_data_path, segmentation_model)
+    # predict_yolo_model('segment', segmentation_inference_data_path, segmentation_model)
+
