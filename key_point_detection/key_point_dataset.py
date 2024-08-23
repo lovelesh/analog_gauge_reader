@@ -29,6 +29,7 @@ class KeypointImageDataSet(Dataset):
                  annotations_dir,
                  train=False,
                  val=False,
+                 test=False,
                  debug=False):
         random.seed(0)
         self.img_dir = img_dir
@@ -37,8 +38,12 @@ class KeypointImageDataSet(Dataset):
         self.image_files = sorted(os.listdir(img_dir))
         self.annotation_files = sorted(os.listdir(annotations_dir))
 
+        print(f"length of image files: {len(self.image_files)}")
+        print(f"length of annotation files: {len(self.annotation_files)}")
+
         self.train = train
         self.val = val
+        self.test = test
 
         self.debug = debug
 
@@ -71,6 +76,9 @@ class KeypointImageDataSet(Dataset):
 
         # Convert to tensors
         if self.val:
+            return transformed_image, image, transformed_annotation
+        
+        if self.test:
             return transformed_image, image, transformed_annotation
         return transformed_image, transformed_annotation
 
@@ -155,6 +163,7 @@ if __name__ == "__main__":
                                    annotations_directory,
                                    train=True,
                                    val=False,
+                                   test=False,
                                    debug=True)
     # pylint: disable=pointless-statement
     dataset[0]

@@ -6,6 +6,7 @@ import logging
 import json
 
 import torch
+import torch.onnx
 
 from torch import nn, optim
 from torch.utils.data import DataLoader
@@ -30,7 +31,9 @@ class KeyPointTrain:
         self.debug = debug
 
         image_folder = os.path.join(base_path, TRAIN_PATH, IMG_PATH)
+        print(image_folder)
         annotation_folder = os.path.join(base_path, TRAIN_PATH, LABEL_PATH)
+        print(annotation_folder)
 
         self.feature_extractor = Encoder(pretrained=True)
 
@@ -145,7 +148,7 @@ def main():
     # train model
     logging.info("Start training")
     if debug:
-        print("start training")
+        print("Start training")
 
     trainer.train(num_epochs, learning_rate)
 
@@ -155,7 +158,17 @@ def main():
 
     # save model
     model_path = os.path.join(run_path, f"model_{time_str}.pt")
+    print(model_path)
     torch.save(model.state_dict(), model_path)
+
+    # export the model to onnx
+    # onnx_model_path = os.path.join(run_path, f"model_{time_str}.onnx")
+    # print(onnx_model_path)
+    # dummy_input = torch.rand(1, INPUT_SIZE)
+    # torch.onnx.export(model,
+    #                   dummy_input,
+    #                   onnx_model_path,
+    #                   )
 
     # save loss file
     loss_path = os.path.join(run_path, "loss.json")
@@ -204,6 +217,7 @@ def read_args():
                         required=True,
                         help="Base path of data")
     parser.add_argument('--val', action='store_true')
+    parser.add_argument('--test', action='store_true')
     parser.add_argument('--debug', action='store_true')
 
     return parser.parse_args()

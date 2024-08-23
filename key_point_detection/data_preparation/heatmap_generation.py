@@ -18,7 +18,7 @@ def get_data_from_json(json_path):
     return data
 
 
-def get_annotations(data):
+def get_annotations(data, debug=False):
     annotation_list = []
     for data_point in data:
 
@@ -35,28 +35,32 @@ def get_annotations(data):
         key_point_annotation['middle'] = []
 
         for annotation in data_point['annotations'][0]['result']:
-
-            if annotation['value']['keypointlabels'][0] == 'Start Notch':
+            if annotation['value']['keypointlabels'][0] == 'start':
                 key_point_annotation['start'].append(
                     {k: annotation['value'][k]
                      for k in ('x', 'y')})
 
-            if annotation['value']['keypointlabels'][0] == 'End Notch':
+            if annotation['value']['keypointlabels'][0] == 'end':
                 key_point_annotation['end'].append(
                     {k: annotation['value'][k]
                      for k in ('x', 'y')})
 
-            if annotation['value']['keypointlabels'][0] == 'Inbetween Notch':
+            if annotation['value']['keypointlabels'][0] == 'middle':
                 key_point_annotation['middle'].append(
                     {k: annotation['value'][k]
                      for k in ('x', 'y')})
 
+        # print the key point annotations for debugging
+        if debug:
+            print(f"start: {key_point_annotation['start']}")
+            print(f"middle: {key_point_annotation['middle']}")
+            print(f"end: {key_point_annotation['end']}")
+            
         annotation_list.append(key_point_annotation)
-
     return annotation_list
 
 
-def add_gaussian_to_heatmap(heatmap, x, y, sigma=8, visualize=False):
+def add_gaussian_to_heatmap(heatmap, x, y, sigma=8, visualize=False, debug=False):
     """
     Generates a 2D Gaussian point at location x,y in tensor t.
 
@@ -85,6 +89,9 @@ def add_gaussian_to_heatmap(heatmap, x, y, sigma=8, visualize=False):
     gaussian = torch.tensor(
         np.exp(-((tx - center)**2 + (ty - center)**2) / (2 * sigma**2)))
 
+    if debug:
+        print(f"x: {x} x1: {x1} x2: {x2}")
+    
     # Determine the bounds of the source gaussian
     g_x_min, g_x_max = max(0, -x1), min(x2, w) - x1
     g_y_min, g_y_max = max(0, -y1), min(y2, h) - y1
@@ -95,6 +102,10 @@ def add_gaussian_to_heatmap(heatmap, x, y, sigma=8, visualize=False):
 
     scale = 255 if visualize else 1
 
+    if debug:
+        print(f"gaussian shape: {np.shape(gaussian[g_y_min:g_y_max, g_x_min:g_x_max])} g_x_min: {g_x_min} g_x_max: {g_x_max}")
+        print(f"heatmap shape: {np.shape(heatmap[img_y_min:img_y_max, img_x_min:img_x_max])} img_x_min: {img_x_min} img_x_max: {img_x_max}")
+    
     # add the gaussian to the heatmap by taking max of values
     heatmap[img_y_min:img_y_max, img_x_min:img_x_max] = \
         np.maximum(scale * gaussian[g_y_min:g_y_max, g_x_min:g_x_max],
@@ -105,7 +116,7 @@ def add_gaussian_to_heatmap(heatmap, x, y, sigma=8, visualize=False):
 
 # key_point_list is list of dicts with 'x' and 'y' coordinate, 1 for each keypoint
 # outputs heatmap
-def generate_heatmap(key_point_list, img=None, size=(448, 448)):
+def generate_heatmap(key_point_list, img=None, size=(448, 448), debug=False):
     # Initialize empty heatmap
     if img is not None:
         heatmap = img
@@ -113,23 +124,30 @@ def generate_heatmap(key_point_list, img=None, size=(448, 448)):
     else:
         heatmap = torch.zeros(size)
         visualize = False
+        # print("image not found")
 
     # For each key point add gaussian kernel centered around it to heatmap
-
     for key_point in key_point_list:
         heatmap = add_gaussian_to_heatmap(heatmap,
                                           key_point['x'] * size[0] / 100,
                                           key_point['y'] * size[1] / 100,
-                                          visualize=visualize)
+                                          visualize=visualize,
+                                          debug=debug)
 
     return heatmap.numpy()
 
 
-def heatmap_from_key_points(annotation, size):
+def heatmap_from_key_points(annotation, size, debug=False):
     size = (size, size)
-    heatmap_start = generate_heatmap(annotation['start'], size=size)
-    heatmap_middle = generate_heatmap(annotation['middle'], size=size)
-    heatmap_end = generate_heatmap(annotation['end'], size=size)
+    if debug:
+        print("getting start annotation")
+    heatmap_start = generate_heatmap(annotation['start'], size=size, debug=debug)
+    if debug:
+        print("getting middle annotation")
+    heatmap_middle = generate_heatmap(annotation['middle'], size=size, debug=debug)
+    if debug:
+        print("getting end annotation")
+    heatmap_end = generate_heatmap(annotation['end'], size=size, debug=debug)
 
     heatmap = np.stack((heatmap_start, heatmap_middle, heatmap_end), axis=0)
     return heatmap
@@ -139,6 +157,7 @@ def main():
     args = read_args()
     json_path = args.annotation
     base_path = args.directory
+    debug = args.debug
 
     img_directory = os.path.join(base_path, IMAGE_DIR)
     label_directory = os.path.join(base_path, LABEL_DIR)
@@ -147,8 +166,8 @@ def main():
         os.makedirs(label_directory)
 
     data = get_data_from_json(json_path)
-    annotations = get_annotations(data)
-
+    annotations = get_annotations(data, debug)
+    
     fig = plt.figure(figsize=(10, 15))
     fig.subplots_adjust(left=0.05,
                         right=0.95,
@@ -160,8 +179,12 @@ def main():
     columns = 2
 
     plot_idx = 1
+    print("Generating heatmaps")
     for i, annotation in enumerate(annotations):
-        heatmap = heatmap_from_key_points(annotation, args.size)
+        if debug:
+            print(f"iter: {i}")
+            print(f"image_name: {annotation['img_name']}")
+        heatmap = heatmap_from_key_points(annotation, args.size, debug=debug)
         if i % 13 == 0:
             img_path = os.path.join(img_directory, annotation['img_name'])
             image = cv2.imread(img_path)
@@ -192,8 +215,10 @@ def read_args():
                         help="Directory where images are and labels go")
     parser.add_argument('--size',
                         type=int,
-                        required=True,
+                        required=False,
+                        default=448,
                         help="Heatmap format is size x size")
+    parser.add_argument('--debug', action='store_true')
 
     return parser.parse_args()
 

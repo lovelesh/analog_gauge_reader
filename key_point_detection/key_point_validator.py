@@ -46,6 +46,10 @@ class KeyPointVal:
         val_image_folder = os.path.join(base_path, VAL_PATH, IMG_PATH)
         val_annotation_folder = os.path.join(base_path, VAL_PATH, LABEL_PATH)
 
+
+        test_image_folder = os.path.join(base_path, TEST_PATH, IMG_PATH)
+        test_annotation_folder = os.path.join(base_path, TEST_PATH, LABEL_PATH)
+
         self.base_path = base_path
         self.model = model
 
@@ -53,13 +57,22 @@ class KeyPointVal:
             img_dir=train_image_folder,
             annotations_dir=train_annotation_folder,
             train=False,
-            val=True)
+            val=True,
+            test=False)
 
         self.val_dataset = KeypointImageDataSet(
             img_dir=val_image_folder,
             annotations_dir=val_annotation_folder,
             train=False,
-            val=True)
+            val=True,
+            test=False)
+        
+        self.test_dataset = KeypointImageDataSet(
+            img_dir=test_image_folder,
+            annotations_dir=test_annotation_folder,
+            train=False,
+            val=False,
+            test=True)
 
     def validate_set(self, path, dataset):
         key_point_metrics_dict = {}
@@ -68,16 +81,19 @@ class KeyPointVal:
             image, original_image, annotation = data
 
             image_name = dataset.get_name(index)
-
+            print(image_name)
             heatmaps = self.model(image.unsqueeze(0))
             print("inference done")
             # take it as numpy array and decrease dimension by one
             heatmaps = heatmaps.detach().numpy().squeeze(0)
+            # print(f"heatmap: {np.shape(heatmaps)}")
 
             # plot the heatmaps in the run folder
-            heatmap_file_path = os.path.join(
-                path, HEATMAP_DIR, HEATMAP_PREFIX + image_name + '.jpg')
-            plot_heatmaps(heatmaps, annotation, heatmap_file_path)
+            if index % 50 == 0:
+                heatmap_file_path = os.path.join(
+                    path, HEATMAP_DIR, HEATMAP_PREFIX + image_name + '.jpg')
+        
+                plot_heatmaps(heatmaps, annotation, heatmap_file_path)
 
             # Extract key points
             key_points_predicted = full_key_point_extraction(heatmaps,
@@ -97,13 +113,14 @@ class KeyPointVal:
                     np.vstack((key_points_true[0], key_points_true[2])))
 
             # plot extracted key points
-            key_point_file_path = os.path.join(
-                path, KEYPOINT_DIR, KEY_POINT_PREFIX + image_name + '.jpg')
-            #resize original image as well
-            original_image_tensor = custom_transforms(train=False,
-                                                      image=original_image)
-            plot_key_points(original_image_tensor, key_points_predicted,
-                            key_points_true, key_point_file_path)
+            if index % 50 == 0:
+                key_point_file_path = os.path.join(
+                    path, KEYPOINT_DIR, KEY_POINT_PREFIX + image_name + '.jpg')
+                #resize original image as well
+                original_image_tensor = custom_transforms(train=False,
+                                                        image=original_image)
+                plot_key_points(original_image_tensor, key_points_predicted,
+                                key_points_true, key_point_file_path)
 
         # Evaluate total metrics and save them to file
         full_metrics_dict = {}
@@ -114,28 +131,37 @@ class KeyPointVal:
         full_metrics_dict["Individual results"] = key_point_metrics_dict
 
         metrics_file_path = os.path.join(path, "key_point_metrics.json")
+        print(f"metrics file path: {metrics_file_path}")
         full_metrics_json = json.dumps(full_metrics_dict, indent=4)
         with open(metrics_file_path, "w") as outfile:
             outfile.write(full_metrics_json)
 
-    def validate(self):
+    def validate(self, train=False, test=False):
         run_path = os.path.join(self.base_path, RUN_PATH + '_' + self.time_str)
         train_path = os.path.join(run_path, TRAIN_PATH)
         val_path = os.path.join(run_path, VAL_PATH)
+        test_path = os.path.join(run_path, TEST_PATH)
 
         os.makedirs(run_path, exist_ok=True)
 
         os.makedirs(train_path, exist_ok=True)
         os.makedirs(val_path, exist_ok=True)
+        os.makedirs(test_path, exist_ok=True)
 
         os.makedirs(os.path.join(train_path, HEATMAP_DIR))
         os.makedirs(os.path.join(train_path, KEYPOINT_DIR))
         os.makedirs(os.path.join(val_path, HEATMAP_DIR))
         os.makedirs(os.path.join(val_path, KEYPOINT_DIR))
+        os.makedirs(os.path.join(test_path, HEATMAP_DIR))
+        os.makedirs(os.path.join(test_path, KEYPOINT_DIR))
 
+        if train:
+            self.validate_set(train_path, self.train_dataset)
+        
         self.validate_set(val_path, self.val_dataset)
-        self.validate_set(train_path, self.train_dataset)
-
+        
+        if test:
+            self.validate_set(test_path, self.test_dataset)
 
 def evaluate_total_metrics(metrics_dict, key):
     total_mean_dist = 0
@@ -267,11 +293,13 @@ def main():
 
     model_path = args.model_path
     base_path = args.data
+    train = args.train
+    test = args.test
 
     model = load_model(model_path)
 
     validator = KeyPointVal(model, base_path)
-    validator.validate()
+    validator.validate(train, test)
 
 
 def read_args():
@@ -285,6 +313,8 @@ def read_args():
                         type=str,
                         required=True,
                         help="Base path of data")
+    parser.add_argument('--train', action='store_true')
+    parser.add_argument('--test', action='store_true')
 
     return parser.parse_args()
 

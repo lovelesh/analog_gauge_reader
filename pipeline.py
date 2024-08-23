@@ -603,13 +603,10 @@ def main():
 
 def read_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--input',
-        type=str,
-        required=True,
-        help=
-        "Path to input image. If a directory then it will pass all images of directory"
-    )
+    parser.add_argument('--input',
+                        type=str,
+                        required=True,
+                        help="Path to input image. If a directory then it will pass all images of directory")
     parser.add_argument('--detection_model',
                         type=str,
                         required=False,

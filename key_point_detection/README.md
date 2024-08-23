@@ -19,11 +19,12 @@ Once you have these images, you can label them with label-studio <https://labels
 After you extract the Json file from label-studio, you can run the heatmap generation file. For this run the following command
 
 ```shell
-python heatmap_generation.py --annotation annotation.json --directory direcotory_path --size SIZE
+python heatmap_generation.py --annotation annotation.json --directory direcotory_path --size SIZE --debug
 ```
+
 For this the directory path should contain the folder images, which holds all images annotated in the json file. The script creates a new subfolder labels, where all annotations are saved. In the end the structure looks like this:
 
-```
+```text
 --direcotory_path
     --images
     --labels
@@ -33,7 +34,7 @@ The argument SIZE is the size of the resized image. The input image and heatmap 
 
 Then structure your labeled data the following way:
 
-```
+```text
 --training_data
     --train
         --images
@@ -42,22 +43,32 @@ Then structure your labeled data the following way:
         --images
         --labels
 ```
-### Training and Validation
+
+### Training, Validation and Testing
 
 To train your model you can run the training script with the following command:
 
 ```shell
 python train.py --epochs epochs --learning_rate initial_learning_rate --data training_data --val --debug
 ```
+
 For `--data` specify the folder `training_data` you set up in the previous step. If you set the flag val, then the validator will immediately run after training, to get qualitative results.
 
 Alternitavely you can validate a model by running the following script:
 
 ```shell
-python key_point_validator.py --model_path path/to/model.pt --data data
+python key_point_validator.py --model_path path/to/model.pt --data training_data --train --test
 ```
 
-Here data is the same base directory `training_data` as before.
+For `--data` specify the folder `training_data` you set up in the previous step. If you specify train flag, then the validator will run the inference on training set. If you specify the test flag, then the validator will run on test dataset.
+
+### To export the model
+
+```shell
+python export_model.py --model_path path/to/model.pt --format onnx/tflite/edgetpu
+```
+
+For `---model_path` specify the pytorch model path. For `--format` specify anyone of onnx, tflite_runtime, egdetpu.
 
 ## Technical details
 
@@ -70,10 +81,12 @@ We use the visual transformer model DinoV2 to extract the features. <https://git
 For the moment we have for the decoder a very simple model which does 1x1 convolutions on the extracted features and then bilinearly upsamples them.
 
 ### Training
+
 For the moment we use training with Adam ob a Binary Cross Entropy loss. Also we use a learning rate scheduler.
 For training we also use data augmentation, specifically random crop, random rotations and random jitter.
 
 ## Keypoint extraction
+
 We use [Mean-Shift](https://en.wikipedia.org/wiki/Mean_shift) to detect key-points.
 Specifically the [sklearn](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MeanShift.html) implementation
 
@@ -83,6 +96,7 @@ Points below the threshold are not considered for clustering. Lowering the thres
 ## Evaluation Predicted Key Points
 
 To compare and evaluate the key points aside from visual inspection we calculate three different metrics.
+
 1. mean distance: Each predicted point is assigned to each true point by lowest euclidean distance
 These minimum distances are then averaged.
 2. PCK: Percentage of correctly predicted true key points:
