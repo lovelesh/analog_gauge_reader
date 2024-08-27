@@ -89,7 +89,7 @@ class KeyPointVal:
             # print(f"heatmap: {np.shape(heatmaps)}")
 
             # plot the heatmaps in the run folder
-            if index % 50 == 0:
+            if index % 10 == 0:
                 heatmap_file_path = os.path.join(
                     path, HEATMAP_DIR, HEATMAP_PREFIX + image_name + '.jpg')
         
@@ -113,7 +113,7 @@ class KeyPointVal:
                     np.vstack((key_points_true[0], key_points_true[2])))
 
             # plot extracted key points
-            if index % 50 == 0:
+            if index % 10 == 0:
                 key_point_file_path = os.path.join(
                     path, KEYPOINT_DIR, KEY_POINT_PREFIX + image_name + '.jpg')
                 #resize original image as well

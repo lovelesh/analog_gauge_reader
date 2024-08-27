@@ -73,8 +73,9 @@ def ocr_warp(image, zero_point, ellipse_params, plotter, debug, multiple_rot,
     # warp the image
     warp_image, transformation_matrix = warp_ellipse_to_circle(
         image, ellipse_center, [ap, bp], phi)
-
-    plotter.plot_any_image(warp_image, "warped")
+    
+    if debug:
+        plotter.plot_any_image(warp_image, "warped")
 
     # move ellipse center and zero point to warped image
     warped_ellipse_center = map_point_transformed_image(

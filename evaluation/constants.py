@@ -52,4 +52,4 @@ FAILED = 'Failed'
 NOT_FOUND = 'not detected'
 MULTIPLE_FOUND = 'multiple detected'
 
-UNIT_LIST = ['bar', 'mbar', 'psi', 'MPa']
+UNIT_LIST = ['bar', 'mbar', 'psi', 'MPa', 'kPa']

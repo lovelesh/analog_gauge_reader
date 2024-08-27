@@ -19,8 +19,13 @@ RUN_PATH = 'run'
 
 class Plotter:
     def __init__(self, run_path, image):
+        if not hasattr(Plotter, 'run_path'):
+            Plotter.run_path = run_path
+            os.mkdir(Plotter.run_path)
+            Plotter.image = image            
+            
         self.run_path = run_path
-        os.mkdir(self.run_path)
+        # os.mkdir(self.run_path)   # Not needed for webcam
         self.image = image
 
     def set_image(self, image):
