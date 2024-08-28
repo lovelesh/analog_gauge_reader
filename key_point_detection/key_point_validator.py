@@ -73,7 +73,7 @@ class KeyPointVal:
             train=False,
             val=False,
             test=True)
-
+    
     def validate_set(self, path, dataset):
         key_point_metrics_dict = {}
         for index, data in enumerate(dataset):

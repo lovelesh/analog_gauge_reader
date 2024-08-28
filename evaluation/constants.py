@@ -48,6 +48,7 @@ NEEDLE_IOU_KEY = 'IoU of needle segmentation'
 
 # Other constants-------------------------------------------------------
 FAILED = 'Failed'
+READING_FAILED = -1
 
 NOT_FOUND = 'not detected'
 MULTIPLE_FOUND = 'multiple detected'

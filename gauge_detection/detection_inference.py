@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 
 
-def detection_gauge_face(img, model_path='best.pt'):
+def detection_gauge_face(img, model_path='best.pt', conf=0.25):
     '''
     uses yolo v8 to get bounding box of gauge face
     :param img: numpy image
@@ -10,7 +10,8 @@ def detection_gauge_face(img, model_path='best.pt'):
     '''
     model = YOLO(model_path)  # load model
 
-    results = model(img)  # run inference, detects gauge face and needle
+    # results = model(img)  # run inference, detects gauge face and needle
+    results = model.predict(img, conf=conf)
 
     # get list of detected boxes, already sorted by confidence
     boxes = results[0].boxes

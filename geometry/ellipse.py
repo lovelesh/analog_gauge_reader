@@ -59,7 +59,7 @@ def cart_to_pol(coeffs):
     f = coeffs[4] / 2
     g = coeffs[5]
 
-    den = b**2 - a * c
+    den = b**2 - (a * c)            # Verify this line
     if den > 0:
         raise ValueError('coeffs do not represent an ellipse: b^2 - 4ac must'
                          ' be negative!')
@@ -95,6 +95,7 @@ def cart_to_pol(coeffs):
     if not width_gt_height:
         # Ensure that phi is the angle to rotate to the semi-major axis.
         phi += np.pi / 2
+    print(f"phi: {type(phi)}, np.pi : {type(np.pi)}")
     phi = phi % np.pi
 
     return x0, y0, ap, bp, phi
