@@ -148,416 +148,412 @@ def process_image(image, detection_model_path, key_point_model_path,
 
     for index, box in enumerate(all_boxes):
         print(f"index: {index}")
-        run_path = os.path.join(run_parent_path, f"{index}")
-        print(f"run_path: {run_path}")
-        plotter.set_run_path(run_path)
-        # crop image to only gauge face
-        cropped_img = crop_image(image, box)
-        # result.append({'reading': 25.89, 'unit' : "psi"}) # only for testing
-        
-        # resize
-        cropped_resized_img = cv2.resize(cropped_img,
-                                        dsize=RESOLUTION,
-                                        interpolation=cv2.INTER_CUBIC)
-
-        if eval_mode:
-            result_full[constants.GAUGE_DET_KEY] = {
-                'x': box[0].item(),
-                'y': box[1].item(),
-                'width': box[2].item() - box[0].item(),
-                'height': box[3].item() - box[1].item(),
-            }
-
-        if debug:
-            plotter.set_image(cropped_resized_img)
-            plotter.plot_image('cropped')
-
-        logging.info("Finish Gauge Detection")
-
-        # ------------------Key Point Detection-------------------------
-
-        if debug:
-            print("-------------------")
-            print("Key Point Detection")
-
-        logging.info("Start key point detection")
-
-        key_point_inferencer = KeyPointInference(key_point_model_path)
-        heatmaps = key_point_inferencer.predict_heatmaps(cropped_resized_img)
-        key_point_list = detect_key_points(heatmaps)
-
-        key_points = key_point_list[1]
-        start_point = key_point_list[0]
-        end_point = key_point_list[2]
-
-        if eval_mode:
-            if start_point.shape == (1, 2):
-                result_full[constants.KEYPOINT_START_KEY] = {
-                    'x': start_point[0][0],
-                    'y': start_point[0][1]
-                }
-            else:
-                result_full[constants.KEYPOINT_START_KEY] = constants.FAILED
-            if end_point.shape == (1, 2):
-                result_full[constants.KEYPOINT_END_KEY] = {
-                    'x': end_point[0][0],
-                    'y': end_point[0][1]
-                }
-            else:
-                result_full[constants.KEYPOINT_END_KEY] = constants.FAILED
-            result_full[constants.KEYPOINT_NOTCH_KEY] = []
-            for point in key_points:
-                result_full[constants.KEYPOINT_NOTCH_KEY].append({
-                    'x': point[0],
-                    'y': point[1]
-                })
-
-        if debug:
-            plotter.plot_heatmaps(heatmaps)
-            plotter.plot_key_points(key_point_list)
-
-        logging.info("Finish key point detection")
-
-        # ------------------Ellipse Fitting-------------------------
-
-        if debug:
-            print("-------------------")
-            print("Ellipse Fitting")
-
-        logging.info("Start ellipse fitting")
-
         try:
-            coeffs = fit_ellipse(key_points[:, 0], key_points[:, 1])
-            ellipse_params = cart_to_pol(coeffs)
-            print(type(ellipse_params))
-        except :
-            logging.error("Ellipse parameters not an ellipse.")
-            errors[constants.NOT_AN_ELLIPSE_ERROR_KEY] = True
-            result.append({
-                constants.READING_KEY: constants.READING_FAILED,
-                constants.MEASURE_UNIT_KEY: constants.FAILED
-            })
-            result_full[constants.OCR_NUM_KEY] = constants.FAILED
-            result_full[constants.NEEDLE_MASK_KEY] = constants.FAILED
-            write_files(result, result_full, errors, run_path, eval_mode)
-            print("Ellipse parameters not an ellipse")
-            continue
-            # raise Exception("Ellipse parameters not an ellipse")
+            # add an index subfolder to the parent path to save individual debug / eval images
+            run_path = os.path.join(run_parent_path, f"{index}")
+            print(f"run_path: {run_path}")
+            plotter.set_run_path(run_path)
+            # crop image to only gauge face
+            cropped_img = crop_image(image, box)
+            # result.append({'reading': 25.89, 'unit' : "psi"}) # only for testing
+            
+            # resize
+            cropped_resized_img = cv2.resize(cropped_img,
+                                            dsize=RESOLUTION,
+                                            interpolation=cv2.INTER_CUBIC)
 
-        ellipse_error = get_ellipse_error(key_points, ellipse_params)
-        errors["Ellipse fit error"] = ellipse_error
-
-        if debug:
-            plotter.plot_ellipse(key_points, ellipse_params, 'key_points')
-
-        logging.info("Finish ellipse fitting")
-
-        # calculate zero point
-
-        # Find bottom point to set there the zero for wrap around
-        if WRAP_AROUND_FIX and start_point.shape == (1, 2) \
-            and end_point.shape == (1, 2):
-            theta_start = get_polar_angle(start_point.flatten(), ellipse_params)
-            theta_end = get_polar_angle(end_point.flatten(), ellipse_params)
-            theta_zero = get_theta_middle(theta_start, theta_end)
-        else:
-            bottom_middle = np.array((RESOLUTION[0] / 2, RESOLUTION[1]))
-            theta_zero = get_polar_angle(bottom_middle, ellipse_params)
-
-        zero_point = get_point_from_angle(theta_zero, ellipse_params)
-        if debug:
-            plotter.plot_zero_point_ellipse(np.array(zero_point),
-                                            np.vstack((start_point, end_point)),
-                                            ellipse_params)
-
-        # ------------------OCR-------------------------
-        
-        # Important detail here: we do the ocr on the cropped non resized image,
-        # to not limit the ocr resolution
-
-        if debug:
-            print("-------------------")
-            print("OCR")
-
-        logging.info("Start OCR")
-
-        cropped_img_resolution = (cropped_img.shape[1], cropped_img.shape[0])
-
-        if RANDOM_ROTATIONS:
-            ocr_readings, ocr_visualization, degree = ocr_rotations(
-                cropped_img, plotter, debug)
-            logging.info("Rotate image by %s degrees", degree)
             if eval_mode:
-                result_full[constants.OCR_ROTATION_KEY] = degree
-        elif WARP_OCR:
-            # resize the zero point and ellipse center to original resolution
-            res_zero_point = list(
-                move_point_resize(zero_point, RESOLUTION, cropped_img_resolution))
-            res_ellipse_params = rescale_ellipse_resize(ellipse_params, RESOLUTION,
-                                                        cropped_img_resolution)
-            # Here we use zero-point rotation
-            if OCR_ROTATION:
-                ocr_readings, ocr_visualization, degree = ocr_warp(
-                    cropped_img, res_zero_point, res_ellipse_params, plotter,
-                    debug, RANDOM_ROTATIONS, ZERO_POINT_ROTATION)
+                result_full[constants.GAUGE_DET_KEY] = {
+                    'x': box[0].item(),
+                    'y': box[1].item(),
+                    'width': box[2].item() - box[0].item(),
+                    'height': box[3].item() - box[1].item(),
+                }
+
+            if debug:
+                plotter.set_image(cropped_resized_img)
+                plotter.plot_image('cropped')
+
+            logging.info("Finish Gauge Detection")
+
+            # ------------------Key Point Detection-------------------------
+
+            if debug:
+                print("-------------------")
+                print("Key Point Detection")
+
+            logging.info("Start key point detection")
+
+            key_point_inferencer = KeyPointInference(key_point_model_path)
+            heatmaps = key_point_inferencer.predict_heatmaps(cropped_resized_img)
+            key_point_list = detect_key_points(heatmaps)
+
+            key_points = key_point_list[1]
+            start_point = key_point_list[0]
+            end_point = key_point_list[2]
+
+            if eval_mode:
+                if start_point.shape == (1, 2):
+                    result_full[constants.KEYPOINT_START_KEY] = {
+                        'x': start_point[0][0],
+                        'y': start_point[0][1]
+                    }
+                else:
+                    result_full[constants.KEYPOINT_START_KEY] = constants.FAILED
+                if end_point.shape == (1, 2):
+                    result_full[constants.KEYPOINT_END_KEY] = {
+                        'x': end_point[0][0],
+                        'y': end_point[0][1]
+                    }
+                else:
+                    result_full[constants.KEYPOINT_END_KEY] = constants.FAILED
+                result_full[constants.KEYPOINT_NOTCH_KEY] = []
+                for point in key_points:
+                    result_full[constants.KEYPOINT_NOTCH_KEY].append({
+                        'x': point[0],
+                        'y': point[1]
+                    })
+
+            if debug:
+                plotter.plot_heatmaps(heatmaps)
+                plotter.plot_key_points(key_point_list)
+
+            logging.info("Finish key point detection")
+
+            # ------------------Ellipse Fitting-------------------------
+
+            if debug:
+                print("-------------------")
+                print("Ellipse Fitting")
+
+            logging.info("Start ellipse fitting")
+
+            try:
+                coeffs = fit_ellipse(key_points[:, 0], key_points[:, 1])
+                ellipse_params = cart_to_pol(coeffs)
+                print(type(ellipse_params))
+            except :
+                logging.error("Ellipse parameters not an ellipse.")
+                errors[constants.NOT_AN_ELLIPSE_ERROR_KEY] = True
+                result.append({
+                    constants.READING_KEY: constants.READING_FAILED,
+                    constants.MEASURE_UNIT_KEY: constants.FAILED
+                })
+                result_full[constants.OCR_NUM_KEY] = constants.FAILED
+                result_full[constants.NEEDLE_MASK_KEY] = constants.FAILED
+                write_files(result, result_full, errors, run_path, eval_mode)
+                raise Exception("Ellipse parameters not an ellipse")
+
+            ellipse_error = get_ellipse_error(key_points, ellipse_params)
+            errors["Ellipse fit error"] = ellipse_error
+
+            if debug:
+                plotter.plot_ellipse(key_points, ellipse_params, 'key_points')
+
+            logging.info("Finish ellipse fitting")
+
+            # calculate zero point
+
+            # Find bottom point to set there the zero for wrap around
+            if WRAP_AROUND_FIX and start_point.shape == (1, 2) \
+                and end_point.shape == (1, 2):
+                theta_start = get_polar_angle(start_point.flatten(), ellipse_params)
+                theta_end = get_polar_angle(end_point.flatten(), ellipse_params)
+                theta_zero = get_theta_middle(theta_start, theta_end)
+            else:
+                bottom_middle = np.array((RESOLUTION[0] / 2, RESOLUTION[1]))
+                theta_zero = get_polar_angle(bottom_middle, ellipse_params)
+
+            zero_point = get_point_from_angle(theta_zero, ellipse_params)
+            if debug:
+                plotter.plot_zero_point_ellipse(np.array(zero_point),
+                                                np.vstack((start_point, end_point)),
+                                                ellipse_params)
+
+            # ------------------OCR-------------------------
+            
+            # Important detail here: we do the ocr on the cropped non resized image,
+            # to not limit the ocr resolution
+
+            if debug:
+                print("-------------------")
+                print("OCR")
+
+            logging.info("Start OCR")
+
+            cropped_img_resolution = (cropped_img.shape[1], cropped_img.shape[0])
+
+            if RANDOM_ROTATIONS:
+                ocr_readings, ocr_visualization, degree = ocr_rotations(
+                    cropped_img, plotter, debug)
+                logging.info("Rotate image by %s degrees", degree)
+                if eval_mode:
+                    result_full[constants.OCR_ROTATION_KEY] = degree
+            elif WARP_OCR:
+                # resize the zero point and ellipse center to original resolution
+                res_zero_point = list(
+                    move_point_resize(zero_point, RESOLUTION, cropped_img_resolution))
+                res_ellipse_params = rescale_ellipse_resize(ellipse_params, RESOLUTION,
+                                                            cropped_img_resolution)
+                # Here we use zero-point rotation
+                if OCR_ROTATION:
+                    ocr_readings, ocr_visualization, degree = ocr_warp(
+                        cropped_img, res_zero_point, res_ellipse_params, plotter,
+                        debug, RANDOM_ROTATIONS, ZERO_POINT_ROTATION)
+                    logging.info("Rotate image by %s degrees", degree)
+                    if eval_mode:
+                        result_full[constants.OCR_ROTATION_KEY] = degree
+                else:
+                    # pylint: disable-next=unbalanced-tuple-unpacking
+                    ocr_readings, ocr_visualization = ocr_warp(
+                        cropped_img, res_zero_point, res_ellipse_params, plotter,
+                        debug, RANDOM_ROTATIONS, ZERO_POINT_ROTATION)
+            elif ZERO_POINT_ROTATION:
+                # resize the zero point and ellipse center to original resolution
+                ellipse_x = ellipse_params[0] * cropped_img.shape[1] / RESOLUTION[1]
+                ellipse_y = ellipse_params[1] * cropped_img.shape[0] / RESOLUTION[0]
+                zero_point_x = zero_point[0] * cropped_img.shape[1] / RESOLUTION[1]
+                zero_point_y = zero_point[1] * cropped_img.shape[0] / RESOLUTION[0]
+
+                ocr_readings, ocr_visualization, degree = ocr_single_rotation(
+                    cropped_img, (zero_point_x, zero_point_y), (ellipse_x, ellipse_y),
+                    plotter, debug)
                 logging.info("Rotate image by %s degrees", degree)
                 if eval_mode:
                     result_full[constants.OCR_ROTATION_KEY] = degree
             else:
-                # pylint: disable-next=unbalanced-tuple-unpacking
-                ocr_readings, ocr_visualization = ocr_warp(
-                    cropped_img, res_zero_point, res_ellipse_params, plotter,
-                    debug, RANDOM_ROTATIONS, ZERO_POINT_ROTATION)
-        elif ZERO_POINT_ROTATION:
-            # resize the zero point and ellipse center to original resolution
-            ellipse_x = ellipse_params[0] * cropped_img.shape[1] / RESOLUTION[1]
-            ellipse_y = ellipse_params[1] * cropped_img.shape[0] / RESOLUTION[0]
-            zero_point_x = zero_point[0] * cropped_img.shape[1] / RESOLUTION[1]
-            zero_point_y = zero_point[1] * cropped_img.shape[0] / RESOLUTION[0]
+                if debug:
+                    ocr_readings, ocr_visualization = ocr(cropped_img, debug)
+                else:
+                    ocr_readings = ocr(cropped_img, debug)
 
-            ocr_readings, ocr_visualization, degree = ocr_single_rotation(
-                cropped_img, (zero_point_x, zero_point_y), (ellipse_x, ellipse_y),
-                plotter, debug)
-            logging.info("Rotate image by %s degrees", degree)
-            if eval_mode:
-                result_full[constants.OCR_ROTATION_KEY] = degree
-        else:
+            # resize detected ocr to our resized image.
+            for reading in ocr_readings:
+                polygon = reading.polygon
+                polygon[:, 0] = polygon[:, 0] * RESOLUTION[1] / cropped_img.shape[1]
+                polygon[:, 1] = polygon[:, 1] * RESOLUTION[0] / cropped_img.shape[0]
+                reading.set_polygon(polygon)
+
             if debug:
-                ocr_readings, ocr_visualization = ocr(cropped_img, debug)
-            else:
-                ocr_readings = ocr(cropped_img, debug)
+                plotter.plot_ocr_visualization(ocr_visualization)
+                plotter.plot_ocr(ocr_readings, title='full')
 
-        # resize detected ocr to our resized image.
-        for reading in ocr_readings:
-            polygon = reading.polygon
-            polygon[:, 0] = polygon[:, 0] * RESOLUTION[1] / cropped_img.shape[1]
-            polygon[:, 1] = polygon[:, 1] * RESOLUTION[0] / cropped_img.shape[0]
-            reading.set_polygon(polygon)
+            # find unit from the detected readings.
+            unit_readings = []
+            for reading in ocr_readings:
+                if reading.is_unit():
+                    unit_readings.append(reading)
 
-        if debug:
-            plotter.plot_ocr_visualization(ocr_visualization)
-            plotter.plot_ocr(ocr_readings, title='full')
-
-        # find unit from the detected readings.
-        unit_readings = []
-        for reading in ocr_readings:
-            if reading.is_unit():
-                unit_readings.append(reading)
-
-        if len(unit_readings) == 0:
-            unit = None
-            result_full[constants.OCR_UNIT_KEY] = constants.NOT_FOUND
-        elif len(unit_readings) == 1:
-            unit = unit_readings[0].reading
-            box = unit_readings[0].get_bounding_box()
-            result_full[constants.OCR_UNIT_KEY] = {
-                'x': box[0],
-                'y': box[1],
-                'width': box[2] - box[0],
-                'height': box[3] - box[1],
-            }
-        # if multiple detections add a list of these readings.
-        else:
-            unit = None
-            result_full[constants.OCR_UNIT_KEY] = constants.MULTIPLE_FOUND
-
-        # get list of ocr readings that are the numbers
-        number_labels = []
-        for reading in ocr_readings:
-            if reading.is_number() and reading.confidence > OCR_THRESHOLD:
-                # Add heuristics to filter out serial numbers
-                if not (abs(reading.number) > 10000 or
-                        (abs(reading.number) > 100 and reading.number % 10 != 0)):
-                    number_labels.append(reading)
-
-        # calculate confidence value for confidence score in final reading
-        mean_number_ocr_conf = 0
-        for number_label in number_labels:
-            mean_number_ocr_conf += number_label.confidence / len(number_labels)
-        errors["OCR numbers mean lack of confidence"] = 1 - mean_number_ocr_conf
-
-        # save the ocr results for the full evaluation
-        if eval_mode:
-            ocr_bbox_list = []
-            for number_label in number_labels:
-                box = number_label.get_bounding_box()
-                ocr_bbox_list.append({
+            if len(unit_readings) == 0:
+                unit = None
+                result_full[constants.OCR_UNIT_KEY] = constants.NOT_FOUND
+            elif len(unit_readings) == 1:
+                unit = unit_readings[0].reading
+                box = unit_readings[0].get_bounding_box()
+                result_full[constants.OCR_UNIT_KEY] = {
                     'x': box[0],
                     'y': box[1],
                     'width': box[2] - box[0],
                     'height': box[3] - box[1],
-                })
-            result_full[constants.OCR_NUM_KEY] = ocr_bbox_list
-
-        if debug:
-            plotter.plot_ocr(number_labels, title='numbers')
-            plotter.plot_ocr(unit_readings, title='unit')
-
-        logging.info("Finish OCR")
-        
-        # ------------------Segmentation-------------------------
-        
-        if debug:
-            print("-------------------")
-            print("Segmentation")
-
-        logging.info("Start segmentation")
-
-        try:
-            needle_mask_x, needle_mask_y = segment_gauge_needle(
-                cropped_resized_img, segmentation_model_path)
-            print(f"image size: {cropped_resized_img.shape}")
-            print(f"{type(needle_mask_x)} : size {needle_mask_x.shape} , {needle_mask_y.shape}")
-        except AttributeError:
-            print("Segmentation failed, no needle found")
-            logging.error("Segmentation failed, no needle found")
-            errors[constants.SEGMENTATION_FAILED_KEY] = True
-            result.append({
-                constants.READING_KEY: constants.READING_FAILED,
-                constants.MEASURE_UNIT_KEY: constants.FAILED
-            })
-            result_full[constants.NEEDLE_MASK_KEY] = constants.FAILED
-            write_files(result, result_full, errors, run_path, eval_mode)
-            # needle_mask_x = np.zeros((cropped_resized_img.shape[1], cropped_resized_img.shape[0]))
-            # needle_mask_y = np.zeros((cropped_resized_img.shape[1], cropped_resized_img.shape[0]))
-            
-            continue
-            # raise Exception("Segmentation failed, no needle found")
-
-        if eval_mode:
-            result_full[constants.NEEDLE_MASK_KEY] = {
-                'x': needle_mask_x.tolist(),
-                'y': needle_mask_y.tolist()
-            }
-
-        needle_line_coeffs, needle_error = get_fitted_line(needle_mask_x,
-                                                        needle_mask_y)
-        needle_line_start_x, needle_line_end_x = get_start_end_line(needle_mask_x)
-        needle_line_start_y, needle_line_end_y = get_start_end_line(needle_mask_y)
-
-        needle_line_start_x, needle_line_end_x = cut_off_line(
-            [needle_line_start_x, needle_line_end_x], needle_line_start_y,
-            needle_line_end_y, needle_line_coeffs)
-
-        errors["Needle line residual variance"] = needle_error
-
-        if debug:
-            plotter.plot_segmented_line(needle_mask_x, needle_mask_y,
-                                        (needle_line_start_x, needle_line_end_x),
-                                        needle_line_coeffs)
-
-        logging.info("Finish segmentation")
-
-        # ------------------Project OCR Numbers to ellipse-------------------------
-
-        if debug:
-            print("-------------------")
-            print("Projection")
-
-        logging.info("Do projection on ellipse")
-
-        if len(number_labels) == 0:
-            print("Didn't find any numbers with ocr")
-            logging.error("Didn't find any numbers with ocr")
-            errors[constants.OCR_NONE_DETECTED_KEY] = True
-            result.append({
-                constants.READING_KEY: constants.READING_FAILED,
-                constants.MEASURE_UNIT_KEY: constants.FAILED
-            })
-            write_files(result, result_full, errors, run_path, eval_mode)
-            continue
-            # raise Exception("OCR failed, no numbers found")
-        if len(number_labels) == 1:
-            logging.warning("Only found 1 number with ocr")
-            errors[constants.OCR_ONLY_ONE_DETECTED_KEY] = True
-
-        for number in number_labels:
-            theta = get_polar_angle(number.center, ellipse_params)
-            number.set_theta(theta)
-
-        if debug:
-            plotter.plot_project_points_ellipse(number_labels, ellipse_params)
-
-        # ------------------Project Needle to ellipse-------------------------
-
-        point_needle_ellipse = get_line_ellipse_point(
-            needle_line_coeffs, (needle_line_start_x, needle_line_end_x),
-            ellipse_params)
-
-        if point_needle_ellipse.shape[0] == 0:
-            print("Needle line and ellipse do not intersect!")
-            logging.error("Needle line and ellipse do not intersect!")
-            errors[constants.OCR_NONE_DETECTED_KEY] = True
-            result.append({
-                constants.READING_KEY: constants.READING_FAILED,
-                constants.MEASURE_UNIT_KEY: constants.FAILED
-            })
-            write_files(result, result_full, errors, run_path, eval_mode)
-            # raise Exception("Needle line and ellipse do not intersect")
-            continue
-
-        if debug:
-            plotter.plot_ellipse(point_needle_ellipse.reshape(1, 2),
-                                ellipse_params, 'needle_point')
-
-        # ------------------Fit line to angles and get reading of needle-------------------------
-
-        # Find angle of needle ellipse point
-        needle_angle = get_polar_angle(point_needle_ellipse, ellipse_params)
-
-        angle_converter = AngleConverter(theta_zero)
-
-        angle_number_list = []
-        for number in number_labels:
-            angle_number_list.append(
-                (angle_converter.convert_angle(number.theta), number.number))
-
-        angle_number_arr = np.array(angle_number_list)
-
-        if RANSAC:
-            reading_line_coeff, inlier_mask, outlier_mask = line_fit_ransac(
-                angle_number_arr[:, 0], angle_number_arr[:, 1])
-        else:
-            reading_line_coeff = line_fit(angle_number_arr[:, 0],
-                                        angle_number_arr[:, 1])
-
-        reading_line = np.poly1d(reading_line_coeff)
-        reading_line_res = np.sum(
-            abs(
-                np.polyval(reading_line_coeff, angle_number_arr[:, 0]) -
-                angle_number_arr[:, 0]))
-        reading_line_mean_err = reading_line_res / len(angle_number_arr)
-        errors["Mean residual on fitted angle line"] = reading_line_mean_err
-
-        needle_angle_conv = angle_converter.convert_angle(needle_angle)
-
-        reading = reading_line(needle_angle_conv)
-
-        result.append({
-            constants.READING_KEY: reading,
-            constants.MEASURE_UNIT_KEY: unit
-        })
-
-        if debug:
-            if RANSAC:
-                plotter.plot_linear_fit_ransac(angle_number_arr,
-                                            (needle_angle_conv, reading),
-                                            reading_line, inlier_mask,
-                                            outlier_mask)
+                }
+            # if multiple detections add a list of these readings.
             else:
-                plotter.plot_linear_fit(angle_number_arr,
-                                        (needle_angle_conv, reading), reading_line)
+                unit = None
+                result_full[constants.OCR_UNIT_KEY] = constants.MULTIPLE_FOUND
 
-            print(f"Final reading is: {reading} {unit}")
-            plotter.plot_final_reading_ellipse([], point_needle_ellipse,
-                                            round(reading, 1), ellipse_params)
+            # get list of ocr readings that are the numbers
+            number_labels = []
+            for reading in ocr_readings:
+                if reading.is_number() and reading.confidence > OCR_THRESHOLD:
+                    # Add heuristics to filter out serial numbers
+                    if not (abs(reading.number) > 10000 or
+                            (abs(reading.number) > 100 and reading.number % 10 != 0)):
+                        number_labels.append(reading)
 
-        # ------------------Write result to file-------------------------
-        if debug:
-            write_files(result, result_full, errors, run_path, eval_mode)
+            # calculate confidence value for confidence score in final reading
+            mean_number_ocr_conf = 0
+            for number_label in number_labels:
+                mean_number_ocr_conf += number_label.confidence / len(number_labels)
+            errors["OCR numbers mean lack of confidence"] = 1 - mean_number_ocr_conf
 
-        # gauge_readings.append({"value": reading, "unit": unit})
-    
+            # save the ocr results for the full evaluation
+            if eval_mode:
+                ocr_bbox_list = []
+                for number_label in number_labels:
+                    box = number_label.get_bounding_box()
+                    ocr_bbox_list.append({
+                        'x': box[0],
+                        'y': box[1],
+                        'width': box[2] - box[0],
+                        'height': box[3] - box[1],
+                    })
+                result_full[constants.OCR_NUM_KEY] = ocr_bbox_list
+
+            if debug:
+                plotter.plot_ocr(number_labels, title='numbers')
+                plotter.plot_ocr(unit_readings, title='unit')
+
+            logging.info("Finish OCR")
+            
+            # ------------------Segmentation-------------------------
+            
+            if debug:
+                print("-------------------")
+                print("Segmentation")
+
+            logging.info("Start segmentation")
+
+            try:
+                needle_mask_x, needle_mask_y = segment_gauge_needle(
+                    cropped_resized_img, segmentation_model_path)
+                print(f"image size: {cropped_resized_img.shape}")
+                print(f"{type(needle_mask_x)} : size {needle_mask_x.shape} , {needle_mask_y.shape}")
+            except AttributeError:
+                logging.error("Segmentation failed, no needle found")
+                errors[constants.SEGMENTATION_FAILED_KEY] = True
+                result.append({
+                    constants.READING_KEY: constants.READING_FAILED,
+                    constants.MEASURE_UNIT_KEY: constants.FAILED
+                })
+                result_full[constants.NEEDLE_MASK_KEY] = constants.FAILED
+                write_files(result, result_full, errors, run_path, eval_mode)
+                raise Exception("Segmentation failed, no needle found")
+
+            if eval_mode:
+                result_full[constants.NEEDLE_MASK_KEY] = {
+                    'x': needle_mask_x.tolist(),
+                    'y': needle_mask_y.tolist()
+                }
+
+            needle_line_coeffs, needle_error = get_fitted_line(needle_mask_x,
+                                                            needle_mask_y)
+            needle_line_start_x, needle_line_end_x = get_start_end_line(needle_mask_x)
+            needle_line_start_y, needle_line_end_y = get_start_end_line(needle_mask_y)
+
+            needle_line_start_x, needle_line_end_x = cut_off_line(
+                [needle_line_start_x, needle_line_end_x], needle_line_start_y,
+                needle_line_end_y, needle_line_coeffs)
+
+            errors["Needle line residual variance"] = needle_error
+
+            if debug:
+                plotter.plot_segmented_line(needle_mask_x, needle_mask_y,
+                                            (needle_line_start_x, needle_line_end_x),
+                                            needle_line_coeffs)
+
+            logging.info("Finish segmentation")
+
+            # ------------------Project OCR Numbers to ellipse-------------------------
+
+            if debug:
+                print("-------------------")
+                print("Projection")
+
+            logging.info("Do projection on ellipse")
+
+            if len(number_labels) == 0:
+                logging.error("Didn't find any numbers with ocr")
+                errors[constants.OCR_NONE_DETECTED_KEY] = True
+                result.append({
+                    constants.READING_KEY: constants.READING_FAILED,
+                    constants.MEASURE_UNIT_KEY: constants.FAILED
+                })
+                write_files(result, result_full, errors, run_path, eval_mode)
+                raise Exception("OCR failed, no numbers found")
+            if len(number_labels) == 1:
+                logging.warning("Only found 1 number with ocr")
+                errors[constants.OCR_ONLY_ONE_DETECTED_KEY] = True
+
+            for number in number_labels:
+                theta = get_polar_angle(number.center, ellipse_params)
+                number.set_theta(theta)
+
+            if debug:
+                plotter.plot_project_points_ellipse(number_labels, ellipse_params)
+
+            # ------------------Project Needle to ellipse-------------------------
+
+            point_needle_ellipse = get_line_ellipse_point(
+                needle_line_coeffs, (needle_line_start_x, needle_line_end_x),
+                ellipse_params)
+
+            if point_needle_ellipse.shape[0] == 0:
+                print("Needle line and ellipse do not intersect!")
+                logging.error("Needle line and ellipse do not intersect!")
+                errors[constants.OCR_NONE_DETECTED_KEY] = True
+                result.append({
+                    constants.READING_KEY: constants.READING_FAILED,
+                    constants.MEASURE_UNIT_KEY: constants.FAILED
+                })
+                write_files(result, result_full, errors, run_path, eval_mode)
+                raise Exception("Needle line and ellipse do not intersect")
+
+            if debug:
+                plotter.plot_ellipse(point_needle_ellipse.reshape(1, 2),
+                                    ellipse_params, 'needle_point')
+
+            # ------------------Fit line to angles and get reading of needle-------------------------
+
+            # Find angle of needle ellipse point
+            needle_angle = get_polar_angle(point_needle_ellipse, ellipse_params)
+
+            angle_converter = AngleConverter(theta_zero)
+
+            angle_number_list = []
+            for number in number_labels:
+                angle_number_list.append(
+                    (angle_converter.convert_angle(number.theta), number.number))
+
+            angle_number_arr = np.array(angle_number_list)
+
+            if RANSAC:
+                reading_line_coeff, inlier_mask, outlier_mask = line_fit_ransac(
+                    angle_number_arr[:, 0], angle_number_arr[:, 1])
+            else:
+                reading_line_coeff = line_fit(angle_number_arr[:, 0],
+                                            angle_number_arr[:, 1])
+
+            reading_line = np.poly1d(reading_line_coeff)
+            reading_line_res = np.sum(
+                abs(
+                    np.polyval(reading_line_coeff, angle_number_arr[:, 0]) -
+                    angle_number_arr[:, 0]))
+            reading_line_mean_err = reading_line_res / len(angle_number_arr)
+            errors["Mean residual on fitted angle line"] = reading_line_mean_err
+
+            needle_angle_conv = angle_converter.convert_angle(needle_angle)
+
+            reading = reading_line(needle_angle_conv)
+
+            result.append({
+                constants.READING_KEY: reading,
+                constants.MEASURE_UNIT_KEY: unit
+            })
+
+            if debug:
+                if RANSAC:
+                    plotter.plot_linear_fit_ransac(angle_number_arr,
+                                                (needle_angle_conv, reading),
+                                                reading_line, inlier_mask,
+                                                outlier_mask)
+                else:
+                    plotter.plot_linear_fit(angle_number_arr,
+                                            (needle_angle_conv, reading), reading_line)
+
+                print(f"Final reading is: {reading} {unit}")
+                plotter.plot_final_reading_ellipse([], point_needle_ellipse,
+                                                round(reading, 1), ellipse_params)
+
+            # ------------------Write result to file-------------------------
+            if debug:
+                write_files(result, result_full, errors, run_path, eval_mode)
+
+        except Exception as err:
+                err_msg = f"Unexpected {err=}, {type(err)=}"
+                print(err_msg)
+                # logging.error(err_msg)
+                pass
+
     return result, all_boxes
     
 
@@ -638,12 +634,18 @@ def main():
         index = int(input_path)
         # print(index)
         cap = cv2.VideoCapture(index)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        # cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+
+        time.sleep(1)
+
         image_base_name = "webcam"
         
         i = 0
-        # Loop through Video Flames
+        # Loop through Video Frames
         while cap.isOpened():
-            time.sleep(2)
             # Read a frame from video
             success, frame = cap.read()
             # image = np.asarray(frame)
@@ -658,51 +660,56 @@ def main():
             else:
                 image_name = image_base_name
             run_path = os.path.join(base_path, image_name)
-            
+
             all_boxes = []
             gauge_readings = []
 
-            # try:
-            gauge_readings, all_boxes = process_image(frame,
-                                        detection_model,
-                                        key_point_model,
-                                        segmentation_model,
-                                        run_path,
-                                        debug=args.debug,
-                                        eval_mode=args.eval,
-                                        image_is_raw=True)
-            # print(f"All boxes: {all_boxes}")
-            print(f"Gauge Readings: {gauge_readings}")
-            # box, all_boxes, results = detection_gauge_face(image, detection_model)
+            try:
+                gauge_readings, all_boxes = process_image(frame,
+                                            detection_model,
+                                            key_point_model,
+                                            segmentation_model,
+                                            run_path,
+                                            debug=args.debug,
+                                            eval_mode=args.eval,
+                                            image_is_raw=True)
+                # print(f"All boxes: {all_boxes}")
+                print(f"Gauge Readings: {gauge_readings}")
+                # box, all_boxes, results = detection_gauge_face(image, detection_model)
                 
-            # except Exception as err:
-            #     err_msg = f"Unexpected {err=}, {type(err)=}"
-            #     print(err_msg)
-            #     logging.error(err_msg)
+            except Exception as err:
+                err_msg = f"Unexpected {err=}, {type(err)=}"
+                print(err_msg)
+                logging.error(err_msg)
 
-            # finally:
-            # Set format for the overlay
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 1
-            box_color = (0, 255, 0)
-            text_color = (0, 255, 255)
-            box_thickness = 2
-            text_thickness = 1
+            finally:
+                # Set format for the overlay
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.8
+                box_color = (0, 255, 0)
+                text_color = (0, 0, 255)
+                box_thickness = 2
+                text_thickness = 2
 
-            # Overlay text on captured image
-            for (box, gauge_reading) in zip(all_boxes, gauge_readings):
-                cv2.rectangle(frame, (int(box[0]), int(box[1])),
-                                (int(box[2]), int(box[3])), box_color, box_thickness)
-                cv2.putText(frame, f"{gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
-                            (int(box[0]), int(box[1]) - 10), font, font_scale, text_color, text_thickness)
+                # Overlay text on captured image
+                for (box, gauge_reading) in zip(all_boxes, gauge_readings):
+                    cv2.rectangle(frame, (int(box[0]), int(box[1])),
+                                    (int(box[2]), int(box[3])), box_color, box_thickness)
+                    cv2.putText(frame, f"{gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
+                                (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
+            
             # Display the frame
             cv2.imshow('Gauge Reading', frame)
                         
             # Break the loop if q is pressed
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            if args.debug:
+                wait_time = 0
+            else:
+                wait_time = 1
+
+            if cv2.waitKey(wait_time) & 0xFF == ord("q"):
                 break
             print("--------------------Inference complete--------------------------")
-            time.sleep(10)
             i += 1
             # time.sleep(2)
         # Release the video capture object and close the display window

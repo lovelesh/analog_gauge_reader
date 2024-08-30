@@ -24,7 +24,7 @@ def ocr(img, visualize=True):
     :return: ocr_results_dict with two keys: 'predictions' what we care about
      and 'visualization' the image for debugging/understanding
     """
-    ocr_model = MMOCRInferencer(det='DB_r18', rec='ABINet')
+    ocr_model = MMOCRInferencer(det='DB_r18', rec='ABINet', device='cuda:0')
 
     readings = []
 
