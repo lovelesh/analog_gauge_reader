@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 
 from plots import RUN_PATH, Plotter
-from gauge_detection.detection_inference import detection_gauge_face
+from gauge_detection.detection_inference import detection_gauge_face, find_center_bbox
 from ocr.ocr_inference import ocr, ocr_rotations, ocr_single_rotation, ocr_warp
 from key_point_detection.key_point_inference import KeyPointInference, detect_key_points
 from geometry.ellipse import fit_ellipse, cart_to_pol, get_line_ellipse_point, \
@@ -21,6 +21,7 @@ from segmentation.segmenation_inference import get_start_end_line, segment_gauge
 # pylint: disable=no-name-in-module
 # pylint: disable=no-member
 from evaluation import constants
+from metadata import METER_CONFIG, get_gauge_details, save_metadata
 
 OCR_THRESHOLD = 0.7
 RESOLUTION = (
@@ -146,12 +147,18 @@ def process_image(image, detection_model_path, key_point_model_path,
     if debug:
         plotter.plot_bounding_box_img(all_boxes)
 
+
     for index, box in enumerate(all_boxes):
-        print(f"index: {index}")
+        if debug:
+            print(f"index: {index}")
+        
         try:
             # add an index subfolder to the parent path to save individual debug / eval images
             run_path = os.path.join(run_parent_path, f"{index}")
-            print(f"run_path: {run_path}")
+            
+            if debug:
+                print(f"run_path: {run_path}")
+            
             plotter.set_run_path(run_path)
             # crop image to only gauge face
             cropped_img = crop_image(image, box)
@@ -231,7 +238,7 @@ def process_image(image, detection_model_path, key_point_model_path,
             try:
                 coeffs = fit_ellipse(key_points[:, 0], key_points[:, 1])
                 ellipse_params = cart_to_pol(coeffs)
-                print(type(ellipse_params))
+                # print(type(ellipse_params))
             except :
                 logging.error("Ellipse parameters not an ellipse.")
                 errors[constants.NOT_AN_ELLIPSE_ERROR_KEY] = True
@@ -271,7 +278,7 @@ def process_image(image, detection_model_path, key_point_model_path,
                                                 ellipse_params)
 
             # ------------------OCR-------------------------
-            
+            '''
             # Important detail here: we do the ocr on the cropped non resized image,
             # to not limit the ocr resolution
 
@@ -343,6 +350,7 @@ def process_image(image, detection_model_path, key_point_model_path,
             for reading in ocr_readings:
                 if reading.is_unit():
                     unit_readings.append(reading)
+            print(f"unit readings {unit_readings}")
 
             if len(unit_readings) == 0:
                 unit = None
@@ -369,6 +377,7 @@ def process_image(image, detection_model_path, key_point_model_path,
                     if not (abs(reading.number) > 10000 or
                             (abs(reading.number) > 100 and reading.number % 10 != 0)):
                         number_labels.append(reading)
+            print(f"Number Labels: {number_labels}")
 
             # calculate confidence value for confidence score in final reading
             mean_number_ocr_conf = 0
@@ -394,7 +403,7 @@ def process_image(image, detection_model_path, key_point_model_path,
                 plotter.plot_ocr(unit_readings, title='unit')
 
             logging.info("Finish OCR")
-            
+            '''
             # ------------------Segmentation-------------------------
             
             if debug:
@@ -406,8 +415,8 @@ def process_image(image, detection_model_path, key_point_model_path,
             try:
                 needle_mask_x, needle_mask_y = segment_gauge_needle(
                     cropped_resized_img, segmentation_model_path)
-                print(f"image size: {cropped_resized_img.shape}")
-                print(f"{type(needle_mask_x)} : size {needle_mask_x.shape} , {needle_mask_y.shape}")
+                # print(f"image size: {cropped_resized_img.shape}")
+                # print(f"{type(needle_mask_x)} : size {needle_mask_x.shape} , {needle_mask_y.shape}")
             except AttributeError:
                 logging.error("Segmentation failed, no needle found")
                 errors[constants.SEGMENTATION_FAILED_KEY] = True
@@ -444,7 +453,7 @@ def process_image(image, detection_model_path, key_point_model_path,
             logging.info("Finish segmentation")
 
             # ------------------Project OCR Numbers to ellipse-------------------------
-
+            '''
             if debug:
                 print("-------------------")
                 print("Projection")
@@ -470,7 +479,7 @@ def process_image(image, detection_model_path, key_point_model_path,
 
             if debug:
                 plotter.plot_project_points_ellipse(number_labels, ellipse_params)
-
+            '''
             # ------------------Project Needle to ellipse-------------------------
 
             point_needle_ellipse = get_line_ellipse_point(
@@ -491,7 +500,7 @@ def process_image(image, detection_model_path, key_point_model_path,
             if debug:
                 plotter.plot_ellipse(point_needle_ellipse.reshape(1, 2),
                                     ellipse_params, 'needle_point')
-
+            
             # ------------------Fit line to angles and get reading of needle-------------------------
 
             # Find angle of needle ellipse point
@@ -499,54 +508,79 @@ def process_image(image, detection_model_path, key_point_model_path,
 
             angle_converter = AngleConverter(theta_zero)
 
-            angle_number_list = []
-            for number in number_labels:
-                angle_number_list.append(
-                    (angle_converter.convert_angle(number.theta), number.number))
+            # angle_number_list = []
+            # for number in number_labels:
+            #     angle_number_list.append(
+            #         (angle_converter.convert_angle(number.theta), number.number))
+            # print(f"Actual angle number list {angle_number_list}")
+            
+            try:
+                # Find the gauge index from the bounding box
+                gauge_index = get_gauge_details(box)  
 
-            angle_number_arr = np.array(angle_number_list)
+                # Extract units from the metadata
+                unit = METER_CONFIG[gauge_index]['unit']
 
-            if RANSAC:
-                reading_line_coeff, inlier_mask, outlier_mask = line_fit_ransac(
-                    angle_number_arr[:, 0], angle_number_arr[:, 1])
-            else:
-                reading_line_coeff = line_fit(angle_number_arr[:, 0],
-                                            angle_number_arr[:, 1])
+                if debug:
+                    print(f"Gauge Index: {gauge_index}")
 
-            reading_line = np.poly1d(reading_line_coeff)
-            reading_line_res = np.sum(
-                abs(
-                    np.polyval(reading_line_coeff, angle_number_arr[:, 0]) -
-                    angle_number_arr[:, 0]))
-            reading_line_mean_err = reading_line_res / len(angle_number_arr)
-            errors["Mean residual on fitted angle line"] = reading_line_mean_err
+                # make list of start and end angles along with values
+                angle_number_list = [(angle_converter.convert_angle(theta_start), METER_CONFIG[gauge_index]['start']), (angle_converter.convert_angle(theta_end), METER_CONFIG[gauge_index]['end'])]
+                
+                if debug:
+                    print(f"Angle Number List: {angle_number_list}")
+                
+                angle_number_arr = np.array(angle_number_list)
 
-            needle_angle_conv = angle_converter.convert_angle(needle_angle)
-
-            reading = reading_line(needle_angle_conv)
-
-            result.append({
-                constants.READING_KEY: reading,
-                constants.MEASURE_UNIT_KEY: unit
-            })
-
-            if debug:
                 if RANSAC:
-                    plotter.plot_linear_fit_ransac(angle_number_arr,
-                                                (needle_angle_conv, reading),
-                                                reading_line, inlier_mask,
-                                                outlier_mask)
+                    reading_line_coeff, inlier_mask, outlier_mask = line_fit_ransac(
+                        angle_number_arr[:, 0], angle_number_arr[:, 1])
                 else:
-                    plotter.plot_linear_fit(angle_number_arr,
-                                            (needle_angle_conv, reading), reading_line)
+                    reading_line_coeff = line_fit(angle_number_arr[:, 0],
+                                                angle_number_arr[:, 1])
 
-                print(f"Final reading is: {reading} {unit}")
-                plotter.plot_final_reading_ellipse([], point_needle_ellipse,
-                                                round(reading, 1), ellipse_params)
+                reading_line = np.poly1d(reading_line_coeff)
+                reading_line_res = np.sum(
+                    abs(
+                        np.polyval(reading_line_coeff, angle_number_arr[:, 0]) -
+                        angle_number_arr[:, 0]))
+                reading_line_mean_err = reading_line_res / len(angle_number_arr)
+                errors["Mean residual on fitted angle line"] = reading_line_mean_err
 
-            # ------------------Write result to file-------------------------
-            if debug:
-                write_files(result, result_full, errors, run_path, eval_mode)
+                needle_angle_conv = angle_converter.convert_angle(needle_angle)
+
+                reading = reading_line(needle_angle_conv)
+
+                result.append({
+                    constants.READING_KEY: reading,
+                    constants.MEASURE_UNIT_KEY: unit
+                })
+
+                if debug:
+                    if RANSAC:
+                        plotter.plot_linear_fit_ransac(angle_number_arr,
+                                                    (needle_angle_conv, reading),
+                                                    reading_line, inlier_mask,
+                                                    outlier_mask)
+                    else:
+                        plotter.plot_linear_fit(angle_number_arr,
+                                                (needle_angle_conv, reading), reading_line)
+
+                    print(f"Final reading is: {reading} {unit}")
+                    plotter.plot_final_reading_ellipse([], point_needle_ellipse,
+                                                    round(reading, 1), ellipse_params)
+
+                # ------------------Write result to file-------------------------
+                if debug:
+                    write_files(result, result_full, errors, run_path, eval_mode)
+            
+            except Exception as err:
+                err_msg = f"Unexpected {err=}, {type(err)=}"
+                print(err_msg)
+                result.append({
+                    constants.READING_KEY: constants.READING_FAILED,
+                    constants.MEASURE_UNIT_KEY: constants.FAILED
+                })
 
         except Exception as err:
                 err_msg = f"Unexpected {err=}, {type(err)=}"
@@ -555,7 +589,6 @@ def process_image(image, detection_model_path, key_point_model_path,
                 pass
 
     return result, all_boxes
-    
 
 def write_files(result, result_full, errors, run_path, eval_mode):
     result_path = os.path.join(run_path, constants.RESULT_FILE_NAME)
@@ -575,6 +608,12 @@ def write_json_file(filename, dictionary):
     with open(filename, "w") as outfile:
         outfile.write(file_json)
 
+
+def capture_xy(action, x, y, flags, *userdata):
+
+    if action == cv2.EVENT_LBUTTONDBLCLK:
+        save_metadata(x, y)
+            
 
 def main():
     args = read_args()
@@ -682,22 +721,25 @@ def main():
                 print(err_msg)
                 logging.error(err_msg)
 
-            finally:
-                # Set format for the overlay
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.8
-                box_color = (0, 255, 0)
-                text_color = (0, 0, 255)
-                box_thickness = 2
-                text_thickness = 2
+            # finally:
+            # Set format for the overlay
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.8
+            box_color = (0, 255, 0)
+            text_color = (0, 0, 255)
+            box_thickness = 2
+            text_thickness = 2
 
-                # Overlay text on captured image
-                for (box, gauge_reading) in zip(all_boxes, gauge_readings):
-                    cv2.rectangle(frame, (int(box[0]), int(box[1])),
-                                    (int(box[2]), int(box[3])), box_color, box_thickness)
-                    cv2.putText(frame, f"{gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
-                                (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
+            # Overlay text on captured image
+            for (box, gauge_reading) in zip(all_boxes, gauge_readings):
+                cv2.rectangle(frame, (int(box[0]), int(box[1])),
+                                (int(box[2]), int(box[3])), box_color, box_thickness)
+                cv2.putText(frame, f"{gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
+                            (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
             
+            # Set callback for mouse events
+            cv2.namedWindow('Gauge Reading')
+            cv2.setMouseCallback('Gauge Reading', capture_xy)
             # Display the frame
             cv2.imshow('Gauge Reading', frame)
                         
@@ -707,7 +749,12 @@ def main():
             else:
                 wait_time = 1
 
-            if cv2.waitKey(wait_time) & 0xFF == ord("q"):
+            key = cv2.waitKey(wait_time) & 0xFF
+            if key == ord('r'):
+                METER_CONFIG.clear()
+                print("Metadata resetted")
+
+            elif key == ord('q'):
                 break
             print("--------------------Inference complete--------------------------")
             i += 1

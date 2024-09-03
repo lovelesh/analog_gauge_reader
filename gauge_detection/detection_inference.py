@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 
 
-def detection_gauge_face(img, model_path='best.pt', conf=0.25):
+def   detection_gauge_face(img, model_path='best.pt', conf=0.25):
     '''
     uses yolo v8 to get bounding box of gauge face
     :param img: numpy image
@@ -27,3 +27,7 @@ def detection_gauge_face(img, model_path='best.pt', conf=0.25):
         box_list.append(box.xyxy[0].int())
 
     return gauge_face_box.xyxy[0].int(), box_list
+
+def find_center_bbox(box):
+    center = (int(box[0]) + (int(box[2] - box[0]) // 2), int(box[1]) + (int(box[3] - box[1]) // 2))
+    return center
