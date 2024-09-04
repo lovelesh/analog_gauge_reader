@@ -21,7 +21,7 @@ from segmentation.segmenation_inference import get_start_end_line, segment_gauge
 # pylint: disable=no-name-in-module
 # pylint: disable=no-member
 from evaluation import constants
-from metadata import METER_CONFIG, get_gauge_details, save_metadata
+import metadata
 
 OCR_THRESHOLD = 0.7
 RESOLUTION = (
@@ -516,16 +516,17 @@ def process_image(image, detection_model_path, key_point_model_path,
             
             try:
                 # Find the gauge index from the bounding box
-                gauge_index = get_gauge_details(box)  
+                gauge_index = metadata.get_gauge_details(box)  
 
                 # Extract units from the metadata
-                unit = METER_CONFIG[gauge_index]['unit']
+                unit = metadata.meter_config[gauge_index]['unit']
 
                 if debug:
                     print(f"Gauge Index: {gauge_index}")
 
                 # make list of start and end angles along with values
-                angle_number_list = [(angle_converter.convert_angle(theta_start), METER_CONFIG[gauge_index]['start']), (angle_converter.convert_angle(theta_end), METER_CONFIG[gauge_index]['end'])]
+                angle_number_list = [(angle_converter.convert_angle(theta_start), metadata.meter_config[gauge_index]['start']), 
+                                     (angle_converter.convert_angle(theta_end), metadata.meter_config[gauge_index]['end'])]
                 
                 if debug:
                     print(f"Angle Number List: {angle_number_list}")
@@ -602,18 +603,22 @@ def write_files(result, result_full, errors, run_path, eval_mode):
                                         constants.RESULT_FULL_FILE_NAME)
         write_json_file(result_full_path, result_full)
 
-
 def write_json_file(filename, dictionary):
     file_json = json.dumps(dictionary, indent=4)
     with open(filename, "w") as outfile:
         outfile.write(file_json)
+    outfile.close()
 
+def read_json_file(filename):
+    with open(filename, "r") as infile:
+        dictionary = json.load(infile)
+    infile.close()
+    return dictionary
 
 def capture_xy(action, x, y, flags, *userdata):
 
     if action == cv2.EVENT_LBUTTONDBLCLK:
-        save_metadata(x, y)
-            
+        metadata.save_metadata(x, y)         
 
 def main():
     args = read_args()
@@ -623,6 +628,7 @@ def main():
     key_point_model = args.key_point_model
     segmentation_model = args.segmentation_model
     base_path = args.base_path
+    metadata_path = args.metadata
 
     time_str = time.strftime("%Y%m%d%H%M%S")
     base_path = os.path.join(base_path, RUN_PATH + '_' + time_str)
@@ -638,6 +644,10 @@ def main():
                         filemode='w',
                         format='%(name)s - %(levelname)s - %(message)s',
                         level=logging.INFO)
+    
+    metadata.meter_config = read_json_file(metadata_path)
+    if args.debug:
+        print(f"Read METER Data: {metadata.meter_config}")
 
     if os.path.isfile(input_path):
         image_name = os.path.basename(input_path)
@@ -683,6 +693,11 @@ def main():
         image_base_name = "webcam"
         
         i = 0
+        # Break the loop if q is pressed
+        if args.debug:
+            wait_time = 0
+        else:
+            wait_time = 20
         # Loop through Video Frames
         while cap.isOpened():
             # Read a frame from video
@@ -742,18 +757,34 @@ def main():
             cv2.setMouseCallback('Gauge Reading', capture_xy)
             # Display the frame
             cv2.imshow('Gauge Reading', frame)
-                        
-            # Break the loop if q is pressed
-            if args.debug:
-                wait_time = 0
-            else:
-                wait_time = 1
 
-            key = cv2.waitKey(wait_time) & 0xFF
+            key = cv2.waitKey(wait_time)  & 0xFF
             if key == ord('r'):
-                METER_CONFIG.clear()
-                print("Metadata resetted")
+                metadata.meter_config.clear()
+                if args.debug:
+                    print("Metadata resetted")
+                    print(metadata.meter_config)
 
+            elif key == ord('d'):
+                if args.debug:
+                    print(f"Current METER Data: {metadata.meter_config}")
+            
+            elif key == ord('s'):
+                write_json_file(metadata_path, metadata.meter_config)
+                if args.debug:
+                    print(f"Saving METER Data: {metadata.meter_config}")
+                
+            elif key == ord('o'):
+                metadata.meter_config = read_json_file(metadata_path)
+                if args.debug:
+                    print(f"Read METER Data: {metadata.meter_config}")
+
+            elif key == ord('c'):
+                wait_time = 0
+
+            elif key == ord('v'):
+                wait_time = 20
+            
             elif key == ord('q'):
                 break
             print("--------------------Inference complete--------------------------")
@@ -794,6 +825,11 @@ def read_args():
                         required=False,
                         default="results",
                         help="Path where run folder is stored")
+    parser.add_argument('--metadata',
+                        type=str,
+                        required=False,
+                        default="metadata.json",
+                        help="Path to metadata file")
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--eval', action='store_true')
     return parser.parse_args()

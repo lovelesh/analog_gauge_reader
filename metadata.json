@@ -1,0 +1,32 @@
+[
+    {
+        "name": "qweqe",
+        "start": 0,
+        "end": 200,
+        "unit": "psi",
+        "center": [
+            986,
+            224
+        ]
+    },
+    {
+        "name": "rtyrt",
+        "start": 0,
+        "end": 800,
+        "unit": "kpa",
+        "center": [
+            1014,
+            582
+        ]
+    },
+    {
+        "name": "opipp",
+        "start": 0,
+        "end": 400,
+        "unit": "psi",
+        "center": [
+            634,
+            491
+        ]
+    }
+]

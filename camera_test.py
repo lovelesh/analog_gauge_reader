@@ -1,15 +1,16 @@
 import cv2
 import numpy as np
 from gauge_detection.detection_inference import detection_gauge_face, find_center_bbox
-from metadata import METER_CONFIG, get_gauge_details, save_metadata
+import metadata
 from easygui import *
+import json
 
 # egdemo()
 
 
 # meter_index = 0
 
-# METER_CONFIG = [{
+# meter_config = [{
 #             'name' : 'boiler pressure',
 #             'start_value' : 0,
 #             'range' : 800,
@@ -29,30 +30,25 @@ from easygui import *
 #             'center' : (504, 610)
 # }]
 
+# meter_config = []
+
 # def get_gauge_details(box):
-#     for index in range(len(METER_CONFIG)):
-#         # print(f"index: {index}")
-#         # point = tuple(METER_CONFIG[index]['center'])
-#         # print(point)
-#         if (METER_CONFIG[index]['center'][0] > int(box[0]) and 
-#             METER_CONFIG[index]['center'][0] < int(box[2]) and
-#             METER_CONFIG[index]['center'][1] > int(box[1]) and
-#             METER_CONFIG[index]['center'][1] < int(box[3])):
+#     print(type(meter_config))
+#     for index in range(len(meter_config)):
+#         print(meter_config[index]['center'][0])
+#         if (meter_config[index]['center'][0] > int(box[0]) and 
+#             meter_config[index]['center'][0] < int(box[2]) and
+#             meter_config[index]['center'][1] > int(box[1]) and
+#             meter_config[index]['center'][1] < int(box[3])):
 #             return index
     
 #     print("no Gauge details found")
-#     return -1
-
-
-# def find_center_bbox(box):
-#     center = (int(box[0]) + (int(box[2] - box[0]) // 2), int(box[1]) + (int(box[3] - box[1]) // 2))
-#     # print(f"center : {center}")
-#     return center
+#     raise Exception("no Gauge details found")
 
 # def save_metadata(x, y):
 #     title = "Meter Metadata"
 #     msg = "Enter metadata for the gauge"
-#     fieldNames = ['name', 'start', 'end', 'unit']
+#     fieldNames = ["Name", "Start", "End", "Unit"]
 #     fieldValues = []
 #     fieldValues = multenterbox(msg, title, fieldNames)
 #     print(f"received info: {fieldValues}")
@@ -63,35 +59,41 @@ from easygui import *
 #         if fieldValues[i].strip == "" :
 #             errmsg = errmsg + ("%s is required\n" % fieldNames[i])
 #     if errmsg == "":
-#         # copy fieldValues to METER_CONFIG variable
-#         METER_CONFIG.append({
-#                 'name' : fieldValues[0],
-#                 'start' : int(fieldValues[1]),
-#                 'end' : int(fieldValues[2]),
-#                 'unit' : fieldValues[3],
-#                 'center' : (x, y) 
+#         # copy fieldValues to meter_config variable
+#         meter_config.append({
+#                 "name" : fieldValues[0],
+#                 "start" : int(fieldValues[1]),
+#                 "end" : int(fieldValues[2]),
+#                 "unit" : fieldValues[3],
+#                 "center" : list((x, y)) 
 #         })
+#         print(meter_config)
 #         return True
+      
     
 
 def capture_xy(action, x, y, flags, *userdata):
     # global meter_index
 
     if action == cv2.EVENT_LBUTTONDBLCLK:
-        # print(f"Meter Metadata: {METER_CONFIG[meter_index]}")
-        if save_metadata(x, y) == True:
-            print(f"Meter Metadata: {METER_CONFIG}")
-            # meter_index += 1
-        # except IndexError:
-        #     print("adding empty dict entry")
-        #     METER_CONFIG.append({
-        #         'name' : '',
-        #         'start' : 0,
-        #         'end' : 0,
-        #         'unit' : '',
-        #         'center' : (0, 0)
-        #     })
-        #     print(METER_CONFIG)
+        # print(f"Meter Metadata: {meter_config[meter_index]}")
+        metadata.save_metadata(x, y)
+        # write_json_file(userdata[0], meter_config)
+
+
+def write_json_file(filename, dictionary):
+    file_json = json.dumps(dictionary, indent=4)
+    with open(filename, "w") as outfile:
+        outfile.write(file_json)
+    outfile.close()
+
+def read_json_file(filename):
+    dictionary = []
+    with open(filename, "r") as infile:
+        dictionary = json.load(infile)
+    infile.close()
+    return dictionary
+
 
 def main():
     # Open the camera (0 is typically the default camera) 
@@ -102,7 +104,12 @@ def main():
     # cap.set(cv2.CAP_PROP_FOCUS, 20)
     # focus_value = 0  # Example focus value
     # zoom_value = 0 
-    # global meter_index
+    # global meter_config
+    # metadata.initialize()
+    metadata_path = "metadata.json"
+    metadata.meter_config = read_json_file(metadata_path)
+    print(f"Read METER Data: {metadata.meter_config}")
+
     # Check if the camera opened successfully 
     while cap.isOpened():
         # Read a frame from video
@@ -134,28 +141,27 @@ def main():
                 cv2.rectangle(frame, (int(box[0]), int(box[1])),
                             (int(box[2]), int(box[3])), box_color, box_thickness)
                 
-                # print(type(METER_CONFIG[index]['center'][0]))
-                # print(METER_CONFIG[index]['center'])
-                # x = tuple(METER_CONFIG[index]['center'])
+                # print(type(meter_config[index]['center'][0]))
+                # print(meter_config[index]['center'])
+                # x = tuple(meter_config[index]['center'])
                 # print(f"Center : {find_center_bbox(box)}")
                 try: 
-                    gauge_index = get_gauge_details(box)
-                    print(f"Gauge Details: {gauge_index}")
-                    # print(f"Gauge details: {METER_CONFIG[get_gauge_details(box)]}")
-                    cv2.putText(frame, f"#{index} {METER_CONFIG[gauge_index]['name']} {METER_CONFIG[gauge_index]['end']} {METER_CONFIG[gauge_index]['unit']}",
-                                METER_CONFIG[gauge_index]['center'], font, font_scale, text_color, text_thickness)
+                    gauge_index = metadata.get_gauge_details(box)
+                    print(f"Gauge Details: {gauge_index} {metadata.meter_config[gauge_index]}")
+                    cv2.putText(frame, f"#{index} {metadata.meter_config[gauge_index]['name']} {metadata.meter_config[gauge_index]['end']} {metadata.meter_config[gauge_index]['unit']}",
+                                find_center_bbox(box), font, font_scale, text_color, text_thickness)
                     
                 except :
                     pass
                     # print("adding empty dict entry")
-                    # METER_CONFIG.append({
+                    # meter_config.append({
                     #     'name' : '',
                     #     'start' : 0,
                     #     'end' : 0,
                     #     'unit' : '',
                     #     'center' : (0, 0)
                     # })
-                    # print(METER_CONFIG)
+                    # print(meter_config)
 
             # Set callback for mouse events
             cv2.namedWindow("Webcam Feed")
@@ -163,9 +169,21 @@ def main():
             cv2.imshow("Webcam Feed", frame) 
             key = cv2.waitKey(0)  & 0xFF # Wait for a key press to close the window 
             if key == ord('r'):
-                METER_CONFIG.clear()
+                metadata.meter_config.clear()
                 print("Metadata resetted")
+                print(metadata.meter_config)
 
+            elif key == ord('d'):
+                print(f"Current METER Data: {metadata.meter_config}")
+            
+            elif key == ord('s'):
+                print(f"Saving METER Data: {metadata.meter_config}")
+                write_json_file(metadata_path, metadata.meter_config)
+
+            elif key == ord('o'):
+                metadata.meter_config = read_json_file(metadata_path)
+                print(f"Read METER Data: {metadata.meter_config}")
+            
             elif key == ord('q'):
                 break
         else: 
@@ -180,4 +198,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
