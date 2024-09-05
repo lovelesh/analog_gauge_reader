@@ -8,7 +8,7 @@ def segment_gauge_needle(image, model_path='best.pt'):
     """
     uses fine-tuned yolo v8 to get mask of segmentation
     :param img: numpy image
-    :param model_path: path to yolov8 detection model
+    :param model_path: path to yolov8 segmentation model
     :return: segmentation of needle
     """
     model = YOLO(model_path)  # load model

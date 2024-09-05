@@ -681,7 +681,6 @@ def main():
 
     elif input_path.isdigit():
         index = int(input_path)
-        # print(index)
         cap = cv2.VideoCapture(index)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
@@ -736,27 +735,27 @@ def main():
                 print(err_msg)
                 logging.error(err_msg)
 
-            # finally:
-            # Set format for the overlay
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.8
-            box_color = (0, 255, 0)
-            text_color = (0, 0, 255)
-            box_thickness = 2
-            text_thickness = 2
+            finally:
+                # Set format for the overlay
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.8
+                box_color = (0, 255, 0)
+                text_color = (0, 0, 255)
+                box_thickness = 2
+                text_thickness = 2
 
-            # Overlay text on captured image
-            for (box, gauge_reading) in zip(all_boxes, gauge_readings):
-                cv2.rectangle(frame, (int(box[0]), int(box[1])),
-                                (int(box[2]), int(box[3])), box_color, box_thickness)
-                cv2.putText(frame, f"{gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
-                            (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
-            
-            # Set callback for mouse events
-            cv2.namedWindow('Gauge Reading')
-            cv2.setMouseCallback('Gauge Reading', capture_xy)
-            # Display the frame
-            cv2.imshow('Gauge Reading', frame)
+                # Overlay text on captured image
+                for (box, gauge_reading) in zip(all_boxes, gauge_readings):
+                    cv2.rectangle(frame, (int(box[0]), int(box[1])),
+                                    (int(box[2]), int(box[3])), box_color, box_thickness)
+                    cv2.putText(frame, f"{gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
+                                (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
+                
+                # Set callback for mouse events
+                cv2.namedWindow('Gauge Reading')
+                cv2.setMouseCallback('Gauge Reading', capture_xy)
+                # Display the frame
+                cv2.imshow('Gauge Reading', frame)
 
             key = cv2.waitKey(wait_time)  & 0xFF
             if key == ord('r'):

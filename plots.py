@@ -40,6 +40,7 @@ class Plotter:
         plt.imshow(self.image)
         path = os.path.join(self.run_path, f"image_{title}.jpg")
         plt.savefig(path)
+        plt.close()
         # plt.show()
 
     def plot_any_image(self, img, title):
@@ -47,6 +48,7 @@ class Plotter:
         plt.imshow(img)
         path = os.path.join(self.run_path, f"image_{title}.jpg")
         plt.savefig(path)
+        plt.close()
 
     def plot_point_img(self, img, points, title):
         plt.figure()
@@ -54,6 +56,7 @@ class Plotter:
         plt.scatter(points[:, 0], points[:, 1])
         path = os.path.join(self.run_path, f"image_{title}.jpg")
         plt.savefig(path)
+        plt.close()
 
     def plot_ocr_visualization(self, vis, degree=None):
         plt.figure()
@@ -65,6 +68,7 @@ class Plotter:
             path = os.path.join(self.run_path,
                                 f"ocr_visualization_results{degree}.jpg")
         plt.savefig(path)
+        plt.close()
 
     def plot_bounding_box_img(self, boxes):
         """
@@ -90,6 +94,7 @@ class Plotter:
 
         path = os.path.join(self.run_path, "bbox_results.jpg")
         plt.savefig(path)
+        plt.close()
 
     def plot_test_point(self, point, title):
         plt.figure(figsize=(12, 8))
@@ -101,6 +106,7 @@ class Plotter:
 
         path = os.path.join(self.run_path, f"{title}_point_result.jpg")
         plt.savefig(path)
+        plt.close()
 
     def plot_key_points(self, key_point_list):
         plt.figure(figsize=(12, 8))
@@ -133,6 +139,7 @@ class Plotter:
 
         path = os.path.join(self.run_path, "key_point_results.jpg")
         plt.savefig(path)
+        plt.close()
         # plt.show()
 
     def plot_just_ellipse(self, image, ellipse_params, title):
@@ -142,6 +149,7 @@ class Plotter:
         plt.plot(x, y)  # plot ellipse
         path = os.path.join(self.run_path, f"ellipse_{title}.jpg")
         plt.savefig(path)
+        plt.close()
 
     def plot_ellipse(self,
                      points,
@@ -182,6 +190,7 @@ class Plotter:
 
         path = os.path.join(self.run_path, f"ellipse_results_{title}.jpg")
         plt.savefig(path)
+        plt.close()
         # plt.show()
 
     def plot_zero_point_ellipse(self, zero_point, start_end_point,
@@ -221,6 +230,7 @@ class Plotter:
 
         path = os.path.join(self.run_path, "ellipse_zero_point.jpg")
         plt.savefig(path)
+        plt.close()
         # plt.show()
 
     def plot_project_points_ellipse(self, number_labels, ellipse_params):
@@ -306,6 +316,7 @@ class Plotter:
         plt.title(f"ocr results {title}")
         path = os.path.join(self.run_path, f"ocr_results_{title}.jpg")
         plt.savefig(path)
+        plt.close()
         # plt.show()
 
     def plot_segmented_line(self, x_coords, y_coords, x_start_end,
@@ -319,7 +330,7 @@ class Plotter:
 
         path = os.path.join(self.run_path, "segmentation_results.jpg")
         plt.savefig(path)
-
+        plt.close()
         # plt.show()
 
     def plot_heatmaps(self, heatmaps):
@@ -357,6 +368,7 @@ class Plotter:
         # plt.tight_layout()
         path = os.path.join(self.run_path, "heatmaps_results.jpg")
         plt.savefig(path)
+        plt.close()
         # plt.show()
 
     def plot_linear_fit(self, ocr_numbers, needle, line):
@@ -381,6 +393,7 @@ class Plotter:
         # Show the plot
         path = os.path.join(self.run_path, "reading_line_fit.jpg")
         plt.savefig(path)
+        plt.close()
 
     def plot_linear_fit_ransac(self, ocr_numbers, needle, line, inlier_mask,
                                outlier_mask):
@@ -411,3 +424,4 @@ class Plotter:
         # Show the plot
         path = os.path.join(self.run_path, "reading_line_fit.jpg")
         plt.savefig(path)
+        plt.close()
