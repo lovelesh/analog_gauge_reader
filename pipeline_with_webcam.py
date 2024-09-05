@@ -10,7 +10,7 @@ from PIL import Image
 
 from plots import RUN_PATH, Plotter
 from gauge_detection.detection_inference import detection_gauge_face, find_center_bbox
-from ocr.ocr_inference import ocr, ocr_rotations, ocr_single_rotation, ocr_warp
+# from ocr.ocr_inference import ocr, ocr_rotations, ocr_single_rotation, ocr_warp
 from key_point_detection.key_point_inference import KeyPointInference, detect_key_points
 from geometry.ellipse import fit_ellipse, cart_to_pol, get_line_ellipse_point, \
     get_point_from_angle, get_polar_angle, get_theta_middle, get_ellipse_error
@@ -645,9 +645,13 @@ def main():
                         format='%(name)s - %(levelname)s - %(message)s',
                         level=logging.INFO)
     
-    metadata.meter_config = read_json_file(metadata_path)
-    if args.debug:
-        print(f"Read METER Data: {metadata.meter_config}")
+    try:
+        metadata.meter_config = read_json_file(metadata_path)
+        if args.debug:
+            print(f"Read METER Data: {metadata.meter_config}")
+    except:
+        print("No metadata file found")
+        pass
 
     if os.path.isfile(input_path):
         image_name = os.path.basename(input_path)
