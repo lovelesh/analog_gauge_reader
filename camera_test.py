@@ -7,6 +7,7 @@ import json
 
 # egdemo()
 
+WINDOW_NAME = "Webcam Feed"
 
 # meter_index = 0
 
@@ -100,7 +101,7 @@ def main():
     cap = cv2.VideoCapture(0) 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
-    cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+    # cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
     # cap.set(cv2.CAP_PROP_FOCUS, 20)
     # focus_value = 0  # Example focus value
     # zoom_value = 0 
@@ -116,11 +117,7 @@ def main():
         # print(f"Focus: {focus_value}")
         # print(f"zoom : {zoom_value}")
         # cap.set(cv2.CAP_PROP_ZOOM, zoom_value) 
-        success, frame = cap.read()
-        # make a copy of the image 
-        temp = frame.copy()
-
-        
+        success, frame = cap.read()        
 
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.8
@@ -164,9 +161,10 @@ def main():
                     # print(meter_config)
 
             # Set callback for mouse events
-            cv2.namedWindow("Webcam Feed")
-            cv2.setMouseCallback("Webcam Feed", capture_xy)
-            cv2.imshow("Webcam Feed", frame) 
+            cv2.namedWindow(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN)
+            cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            cv2.setMouseCallback(WINDOW_NAME, capture_xy)
+            cv2.imshow(WINDOW_NAME, frame) 
             key = cv2.waitKey(0)  & 0xFF # Wait for a key press to close the window 
             if key == ord('r'):
                 metadata.meter_config.clear()

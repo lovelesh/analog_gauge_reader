@@ -40,6 +40,8 @@ ZERO_POINT_ROTATION = True
 
 OCR_ROTATION = RANDOM_ROTATIONS or ZERO_POINT_ROTATION
 
+WINDOW_NAME = 'Gauge Reading'
+
 
 def crop_image(img, box, flag=False, two_dimensional=False):
     """
@@ -756,10 +758,11 @@ def main():
                                 (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
                 
                 # Set callback for mouse events
-                cv2.namedWindow('Gauge Reading')
-                cv2.setMouseCallback('Gauge Reading', capture_xy)
+                cv2.namedWindow(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN)
+                cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+                cv2.setMouseCallback(WINDOW_NAME, capture_xy)
                 # Display the frame
-                cv2.imshow('Gauge Reading', frame)
+                cv2.imshow(WINDOW_NAME, frame)
 
             key = cv2.waitKey(wait_time)  & 0xFF
             if key == ord('r'):
