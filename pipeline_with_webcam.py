@@ -10,7 +10,6 @@ from PIL import Image
 
 from plots import RUN_PATH, Plotter
 from gauge_detection.detection_inference import detection_gauge_face, find_center_bbox
-# from ocr.ocr_inference import ocr, ocr_rotations, ocr_single_rotation, ocr_warp
 from key_point_detection.key_point_inference import KeyPointInference, detect_key_points
 from geometry.ellipse import fit_ellipse, cart_to_pol, get_line_ellipse_point, \
     get_point_from_angle, get_polar_angle, get_theta_middle, get_ellipse_error
@@ -40,7 +39,7 @@ ZERO_POINT_ROTATION = True
 
 OCR_ROTATION = RANDOM_ROTATIONS or ZERO_POINT_ROTATION
 
-WINDOW_NAME = 'Gauge Reading'
+WINDOW_NAME = "Gauge Reading"
 
 
 def crop_image(img, box, flag=False, two_dimensional=False):
@@ -245,6 +244,7 @@ def process_image(image, detection_model_path, key_point_model_path,
                 logging.error("Ellipse parameters not an ellipse.")
                 errors[constants.NOT_AN_ELLIPSE_ERROR_KEY] = True
                 result.append({
+                    constants.ID_KEY: constants.ID_FAILED,
                     constants.READING_KEY: constants.READING_FAILED,
                     constants.MEASURE_UNIT_KEY: constants.FAILED
                 })
@@ -279,133 +279,6 @@ def process_image(image, detection_model_path, key_point_model_path,
                                                 np.vstack((start_point, end_point)),
                                                 ellipse_params)
 
-            # ------------------OCR-------------------------
-            '''
-            # Important detail here: we do the ocr on the cropped non resized image,
-            # to not limit the ocr resolution
-
-            if debug:
-                print("-------------------")
-                print("OCR")
-
-            logging.info("Start OCR")
-
-            cropped_img_resolution = (cropped_img.shape[1], cropped_img.shape[0])
-
-            if RANDOM_ROTATIONS:
-                ocr_readings, ocr_visualization, degree = ocr_rotations(
-                    cropped_img, plotter, debug)
-                logging.info("Rotate image by %s degrees", degree)
-                if eval_mode:
-                    result_full[constants.OCR_ROTATION_KEY] = degree
-            elif WARP_OCR:
-                # resize the zero point and ellipse center to original resolution
-                res_zero_point = list(
-                    move_point_resize(zero_point, RESOLUTION, cropped_img_resolution))
-                res_ellipse_params = rescale_ellipse_resize(ellipse_params, RESOLUTION,
-                                                            cropped_img_resolution)
-                # Here we use zero-point rotation
-                if OCR_ROTATION:
-                    ocr_readings, ocr_visualization, degree = ocr_warp(
-                        cropped_img, res_zero_point, res_ellipse_params, plotter,
-                        debug, RANDOM_ROTATIONS, ZERO_POINT_ROTATION)
-                    logging.info("Rotate image by %s degrees", degree)
-                    if eval_mode:
-                        result_full[constants.OCR_ROTATION_KEY] = degree
-                else:
-                    # pylint: disable-next=unbalanced-tuple-unpacking
-                    ocr_readings, ocr_visualization = ocr_warp(
-                        cropped_img, res_zero_point, res_ellipse_params, plotter,
-                        debug, RANDOM_ROTATIONS, ZERO_POINT_ROTATION)
-            elif ZERO_POINT_ROTATION:
-                # resize the zero point and ellipse center to original resolution
-                ellipse_x = ellipse_params[0] * cropped_img.shape[1] / RESOLUTION[1]
-                ellipse_y = ellipse_params[1] * cropped_img.shape[0] / RESOLUTION[0]
-                zero_point_x = zero_point[0] * cropped_img.shape[1] / RESOLUTION[1]
-                zero_point_y = zero_point[1] * cropped_img.shape[0] / RESOLUTION[0]
-
-                ocr_readings, ocr_visualization, degree = ocr_single_rotation(
-                    cropped_img, (zero_point_x, zero_point_y), (ellipse_x, ellipse_y),
-                    plotter, debug)
-                logging.info("Rotate image by %s degrees", degree)
-                if eval_mode:
-                    result_full[constants.OCR_ROTATION_KEY] = degree
-            else:
-                if debug:
-                    ocr_readings, ocr_visualization = ocr(cropped_img, debug)
-                else:
-                    ocr_readings = ocr(cropped_img, debug)
-
-            # resize detected ocr to our resized image.
-            for reading in ocr_readings:
-                polygon = reading.polygon
-                polygon[:, 0] = polygon[:, 0] * RESOLUTION[1] / cropped_img.shape[1]
-                polygon[:, 1] = polygon[:, 1] * RESOLUTION[0] / cropped_img.shape[0]
-                reading.set_polygon(polygon)
-
-            if debug:
-                plotter.plot_ocr_visualization(ocr_visualization)
-                plotter.plot_ocr(ocr_readings, title='full')
-
-            # find unit from the detected readings.
-            unit_readings = []
-            for reading in ocr_readings:
-                if reading.is_unit():
-                    unit_readings.append(reading)
-            print(f"unit readings {unit_readings}")
-
-            if len(unit_readings) == 0:
-                unit = None
-                result_full[constants.OCR_UNIT_KEY] = constants.NOT_FOUND
-            elif len(unit_readings) == 1:
-                unit = unit_readings[0].reading
-                box = unit_readings[0].get_bounding_box()
-                result_full[constants.OCR_UNIT_KEY] = {
-                    'x': box[0],
-                    'y': box[1],
-                    'width': box[2] - box[0],
-                    'height': box[3] - box[1],
-                }
-            # if multiple detections add a list of these readings.
-            else:
-                unit = None
-                result_full[constants.OCR_UNIT_KEY] = constants.MULTIPLE_FOUND
-
-            # get list of ocr readings that are the numbers
-            number_labels = []
-            for reading in ocr_readings:
-                if reading.is_number() and reading.confidence > OCR_THRESHOLD:
-                    # Add heuristics to filter out serial numbers
-                    if not (abs(reading.number) > 10000 or
-                            (abs(reading.number) > 100 and reading.number % 10 != 0)):
-                        number_labels.append(reading)
-            print(f"Number Labels: {number_labels}")
-
-            # calculate confidence value for confidence score in final reading
-            mean_number_ocr_conf = 0
-            for number_label in number_labels:
-                mean_number_ocr_conf += number_label.confidence / len(number_labels)
-            errors["OCR numbers mean lack of confidence"] = 1 - mean_number_ocr_conf
-
-            # save the ocr results for the full evaluation
-            if eval_mode:
-                ocr_bbox_list = []
-                for number_label in number_labels:
-                    box = number_label.get_bounding_box()
-                    ocr_bbox_list.append({
-                        'x': box[0],
-                        'y': box[1],
-                        'width': box[2] - box[0],
-                        'height': box[3] - box[1],
-                    })
-                result_full[constants.OCR_NUM_KEY] = ocr_bbox_list
-
-            if debug:
-                plotter.plot_ocr(number_labels, title='numbers')
-                plotter.plot_ocr(unit_readings, title='unit')
-
-            logging.info("Finish OCR")
-            '''
             # ------------------Segmentation-------------------------
             
             if debug:
@@ -423,6 +296,7 @@ def process_image(image, detection_model_path, key_point_model_path,
                 logging.error("Segmentation failed, no needle found")
                 errors[constants.SEGMENTATION_FAILED_KEY] = True
                 result.append({
+                    constants.ID_KEY: constants.ID_FAILED,
                     constants.READING_KEY: constants.READING_FAILED,
                     constants.MEASURE_UNIT_KEY: constants.FAILED
                 })
@@ -454,34 +328,6 @@ def process_image(image, detection_model_path, key_point_model_path,
 
             logging.info("Finish segmentation")
 
-            # ------------------Project OCR Numbers to ellipse-------------------------
-            '''
-            if debug:
-                print("-------------------")
-                print("Projection")
-
-            logging.info("Do projection on ellipse")
-
-            if len(number_labels) == 0:
-                logging.error("Didn't find any numbers with ocr")
-                errors[constants.OCR_NONE_DETECTED_KEY] = True
-                result.append({
-                    constants.READING_KEY: constants.READING_FAILED,
-                    constants.MEASURE_UNIT_KEY: constants.FAILED
-                })
-                write_files(result, result_full, errors, run_path, eval_mode)
-                raise Exception("OCR failed, no numbers found")
-            if len(number_labels) == 1:
-                logging.warning("Only found 1 number with ocr")
-                errors[constants.OCR_ONLY_ONE_DETECTED_KEY] = True
-
-            for number in number_labels:
-                theta = get_polar_angle(number.center, ellipse_params)
-                number.set_theta(theta)
-
-            if debug:
-                plotter.plot_project_points_ellipse(number_labels, ellipse_params)
-            '''
             # ------------------Project Needle to ellipse-------------------------
 
             point_needle_ellipse = get_line_ellipse_point(
@@ -493,6 +339,7 @@ def process_image(image, detection_model_path, key_point_model_path,
                 logging.error("Needle line and ellipse do not intersect!")
                 errors[constants.OCR_NONE_DETECTED_KEY] = True
                 result.append({
+                    constants.ID_KEY: constants.ID_FAILED,
                     constants.READING_KEY: constants.READING_FAILED,
                     constants.MEASURE_UNIT_KEY: constants.FAILED
                 })
@@ -522,6 +369,9 @@ def process_image(image, detection_model_path, key_point_model_path,
 
                 # Extract units from the metadata
                 unit = metadata.meter_config[gauge_index]['unit']
+
+                # Extract id from metadata
+                id = metadata.meter_config[gauge_index]['id']
 
                 if debug:
                     print(f"Gauge Index: {gauge_index}")
@@ -555,6 +405,7 @@ def process_image(image, detection_model_path, key_point_model_path,
                 reading = reading_line(needle_angle_conv)
 
                 result.append({
+                    constants.ID_KEY: id,
                     constants.READING_KEY: reading,
                     constants.MEASURE_UNIT_KEY: unit
                 })
@@ -569,7 +420,7 @@ def process_image(image, detection_model_path, key_point_model_path,
                         plotter.plot_linear_fit(angle_number_arr,
                                                 (needle_angle_conv, reading), reading_line)
 
-                    print(f"Final reading is: {reading} {unit}")
+                    print(f"Final reading is: {id} {reading} {unit}")
                     plotter.plot_final_reading_ellipse([], point_needle_ellipse,
                                                     round(reading, 1), ellipse_params)
 
@@ -581,6 +432,7 @@ def process_image(image, detection_model_path, key_point_model_path,
                 err_msg = f"Unexpected {err=}, {type(err)=}"
                 print(err_msg)
                 result.append({
+                    constants.ID_KEY: constants.ID_FAILED,
                     constants.READING_KEY: constants.READING_FAILED,
                     constants.MEASURE_UNIT_KEY: constants.FAILED
                 })
@@ -754,12 +606,12 @@ def main():
                 for (box, gauge_reading) in zip(all_boxes, gauge_readings):
                     cv2.rectangle(frame, (int(box[0]), int(box[1])),
                                     (int(box[2]), int(box[3])), box_color, box_thickness)
-                    cv2.putText(frame, f"{gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
+                    cv2.putText(frame, f"#{gauge_reading[constants.ID_KEY]} {gauge_reading[constants.READING_KEY]:.2f} 
+                                {gauge_reading[constants.MEASURE_UNIT_KEY]}",
                                 (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
                 
                 # Set callback for mouse events
-                cv2.namedWindow(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN)
-                cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+                cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
                 cv2.setMouseCallback(WINDOW_NAME, capture_xy)
                 # Display the frame
                 cv2.imshow(WINDOW_NAME, frame)

@@ -36,8 +36,8 @@ def get_gauge_details(box):
 
 def save_metadata(x, y):
     title = "Meter Metadata"
-    msg = "Enter metadata for the gauge"
-    fieldNames = ["Name", "Start", "End", "Unit"]
+    msg = "Enter metadata for the Gauge"
+    fieldNames = ["Name", "ID", "Start", "End", "Unit"]
     fieldValues = []
     fieldValues = multenterbox(msg, title, fieldNames)
     print(f"received info: {fieldValues}")
@@ -51,9 +51,10 @@ def save_metadata(x, y):
         # copy fieldValues to meter_config variable
         meter_config.append({
                 "name" : fieldValues[0],
-                "start" : int(fieldValues[1]),
-                "end" : int(fieldValues[2]),
-                "unit" : fieldValues[3],
+                "id" : int(fieldValues[1]),
+                "start" : int(fieldValues[2]),
+                "end" : int(fieldValues[3]),
+                "unit" : fieldValues[4],
                 "center" : list((x, y)) 
         })
         # print(meter_config)

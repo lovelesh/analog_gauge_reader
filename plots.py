@@ -190,7 +190,7 @@ class Plotter:
 
         path = os.path.join(self.run_path, f"ellipse_results_{title}.jpg")
         plt.savefig(path)
-        plt.close()
+        plt.close(fig)
         # plt.show()
 
     def plot_zero_point_ellipse(self, zero_point, start_end_point,
@@ -393,7 +393,7 @@ class Plotter:
         # Show the plot
         path = os.path.join(self.run_path, "reading_line_fit.jpg")
         plt.savefig(path)
-        plt.close()
+        plt.close('all')
 
     def plot_linear_fit_ransac(self, ocr_numbers, needle, line, inlier_mask,
                                outlier_mask):

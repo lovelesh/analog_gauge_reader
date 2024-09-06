@@ -6,6 +6,7 @@ ERROR_FILE_NAME = "error.json"
 ORIGINAL_IMG_FILE_NAME = "original_image.jpg"
 
 # Keys in Json Files-------------------------------------------------
+ID_KEY = "id"
 READING_KEY = "reading"
 RANGE_KEY = "range"
 MEASURE_UNIT_KEY = "unit"
@@ -49,7 +50,7 @@ NEEDLE_IOU_KEY = 'IoU of needle segmentation'
 # Other constants-------------------------------------------------------
 FAILED = 'Failed'
 READING_FAILED = -1
-
+ID_FAILED = -1
 NOT_FOUND = 'not detected'
 MULTIPLE_FOUND = 'multiple detected'
 

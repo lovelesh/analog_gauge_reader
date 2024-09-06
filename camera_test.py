@@ -105,8 +105,6 @@ def main():
     # cap.set(cv2.CAP_PROP_FOCUS, 20)
     # focus_value = 0  # Example focus value
     # zoom_value = 0 
-    # global meter_config
-    # metadata.initialize()
     metadata_path = "metadata.json"
     metadata.meter_config = read_json_file(metadata_path)
     print(f"Read METER Data: {metadata.meter_config}")
@@ -145,24 +143,15 @@ def main():
                 try: 
                     gauge_index = metadata.get_gauge_details(box)
                     print(f"Gauge Details: {gauge_index} {metadata.meter_config[gauge_index]}")
-                    cv2.putText(frame, f"#{index} {metadata.meter_config[gauge_index]['name']} {metadata.meter_config[gauge_index]['end']} {metadata.meter_config[gauge_index]['unit']}",
+                    cv2.putText(frame, f"#{index} #{metadata.meter_config[gauge_index]['id']} {metadata.meter_config[gauge_index]['name']} {metadata.meter_config[gauge_index]['end']} {metadata.meter_config[gauge_index]['unit']}",
                                 find_center_bbox(box), font, font_scale, text_color, text_thickness)
                     
                 except :
                     pass
-                    # print("adding empty dict entry")
-                    # meter_config.append({
-                    #     'name' : '',
-                    #     'start' : 0,
-                    #     'end' : 0,
-                    #     'unit' : '',
-                    #     'center' : (0, 0)
-                    # })
-                    # print(meter_config)
 
             # Set callback for mouse events
-            cv2.namedWindow(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN)
-            cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+            # cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
             cv2.setMouseCallback(WINDOW_NAME, capture_xy)
             cv2.imshow(WINDOW_NAME, frame) 
             key = cv2.waitKey(0)  & 0xFF # Wait for a key press to close the window 
