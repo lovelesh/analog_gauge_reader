@@ -606,8 +606,7 @@ def main():
                 for (box, gauge_reading) in zip(all_boxes, gauge_readings):
                     cv2.rectangle(frame, (int(box[0]), int(box[1])),
                                     (int(box[2]), int(box[3])), box_color, box_thickness)
-                    cv2.putText(frame, f"#{gauge_reading[constants.ID_KEY]} {gauge_reading[constants.READING_KEY]:.2f} 
-                                {gauge_reading[constants.MEASURE_UNIT_KEY]}",
+                    cv2.putText(frame, f"#{gauge_reading[constants.ID_KEY]} {gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
                                 (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
                 
                 # Set callback for mouse events
