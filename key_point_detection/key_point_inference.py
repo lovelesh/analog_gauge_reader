@@ -1,18 +1,21 @@
 from PIL import Image
 
 from key_point_detection.key_point_extraction import full_key_point_extraction
-from key_point_detection.model import load_model
+from key_point_detection.model import load_model, load_optimized_model
 from key_point_detection.key_point_dataset import custom_transforms
 
 
 class KeyPointInference:
-    def __init__(self, model_path):
+    def __init__(self, model_path, optimized=False):
         """Constructor to intialize the key point model
 
         Args:
             model_path (string): Path to the model
         """
-        self.model = load_model(model_path)
+        if not optimized:
+            self.model = load_model(model_path)
+        else:
+            self.model = load_optimized_model(model_path)
 
     def predict_heatmaps(self, image):
         """Key Point Predictor function

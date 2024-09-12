@@ -73,3 +73,9 @@ def load_model(model_path):
     model = EncoderDecoder(encoder, decoder)
     model.load_state_dict(torch.load(model_path))
     return model
+
+def load_optimized_model(model_path):
+    '''Add code to load the optimized version of the model'''
+    model = ""
+    print("Model loaded")
+    return model

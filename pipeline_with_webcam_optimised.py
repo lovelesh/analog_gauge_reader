@@ -192,7 +192,7 @@ def process_image(image, detection_model_path, key_point_model_path,
 
             logging.info("Start key point detection")
 
-            key_point_inferencer = KeyPointInference(key_point_model_path)
+            key_point_inferencer = KeyPointInference(key_point_model_path, optimized=True)
             heatmaps = key_point_inferencer.predict_heatmaps(cropped_resized_img)
             key_point_list = detect_key_points(heatmaps)
 
@@ -239,7 +239,6 @@ def process_image(image, detection_model_path, key_point_model_path,
             try:
                 coeffs = fit_ellipse(key_points[:, 0], key_points[:, 1])
                 ellipse_params = cart_to_pol(coeffs)
-                # print(type(ellipse_params))
             except :
                 logging.error("Ellipse parameters not an ellipse.")
                 errors[constants.NOT_AN_ELLIPSE_ERROR_KEY] = True
@@ -290,8 +289,6 @@ def process_image(image, detection_model_path, key_point_model_path,
             try:
                 needle_mask_x, needle_mask_y = segment_gauge_needle(
                     cropped_resized_img, segmentation_model_path)
-                # print(f"image size: {cropped_resized_img.shape}")
-                # print(f"{type(needle_mask_x)} : size {needle_mask_x.shape} , {needle_mask_y.shape}")
             except AttributeError:
                 logging.error("Segmentation failed, no needle found")
                 errors[constants.SEGMENTATION_FAILED_KEY] = True
@@ -357,12 +354,6 @@ def process_image(image, detection_model_path, key_point_model_path,
 
             angle_converter = AngleConverter(theta_zero)
 
-            # angle_number_list = []
-            # for number in number_labels:
-            #     angle_number_list.append(
-            #         (angle_converter.convert_angle(number.theta), number.number))
-            # print(f"Actual angle number list {angle_number_list}")
-            
             try:
                 # Find the gauge index from the bounding box
                 gauge_index = metadata.get_gauge_details(box)  
@@ -507,37 +498,7 @@ def main():
         print("No metadata file found")
         pass
 
-    if os.path.isfile(input_path):
-        image_name = os.path.basename(input_path)
-        run_path = os.path.join(base_path, image_name)
-        process_image(input_path,
-                      detection_model,
-                      key_point_model,
-                      segmentation_model,
-                      run_path,
-                      debug=args.debug,
-                      eval_mode=args.eval)
-    elif os.path.isdir(input_path):
-        for image_name in os.listdir(input_path):
-            img_path = os.path.join(input_path, image_name)
-            run_path = os.path.join(base_path, image_name)
-            try:
-                process_image(img_path,
-                              detection_model,
-                              key_point_model,
-                              segmentation_model,
-                              run_path,
-                              debug=args.debug,
-                              eval_mode=args.eval)
-
-            # pylint: disable=broad-except
-            # For now want to catch general exceptions and still continue with the other images.
-            except Exception as err:
-                err_msg = f"Unexpected {err=}, {type(err)=}"
-                print(err_msg)
-                logging.error(err_msg)
-
-    elif input_path.isdigit():
+    if input_path.isdigit():
         index = int(input_path)
         cap = cv2.VideoCapture(index)
         # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
@@ -652,8 +613,8 @@ def main():
         cv2.destroyAllWindows()
 
     else:
-        print("Error: input file or directory does not exist.")
-        logging.error("input file or directory does not exist.")
+        print("Error: Enter correct Camera index")
+        logging.error("Invalid camera index")
 
 
 def read_args():
@@ -661,11 +622,12 @@ def read_args():
     parser.add_argument('--input',
                         type=str,
                         required=True,
-                        help="Path to input image. If a directory then it will pass all images of directory")
+                        help="Enter the index of camera input")
     parser.add_argument('--detection_model',
                         type=str,
                         required=False,
-                        default="models/gauge_detection_model.pt",
+                        default="models/gauge_detection_model_custom_trained_saved_model/\
+                            gauge_detection_model_custom_trained_full_integer_quant_edgetpu.tflite",
                         help="Path to detection model")
     parser.add_argument('--key_point_model',
                         type=str,
@@ -675,7 +637,8 @@ def read_args():
     parser.add_argument('--segmentation_model',
                         type=str,
                         required=False,
-                        default="models/segmentation_model.pt",
+                        default="models/segmentation_model_custom_trained_saved_model/\
+                            segmentation_model_custom_trained_full_integer_quant_edgetpu.tflite",
                         help="Path to segmentation model")
     parser.add_argument('--base_path',
                         type=str,
