@@ -7,6 +7,7 @@ import json
 
 import torch
 import torch.onnx
+import onnx, onnxslim
 
 from torch import nn, optim
 from torch.utils.data import DataLoader
@@ -156,19 +157,27 @@ def main():
 
     model = trainer.get_full_model()
 
-    # save model
+    # save state_dict of the model
     model_path = os.path.join(run_path, f"model_{time_str}.pt")
     print(model_path)
     torch.save(model.state_dict(), model_path)
 
+    # save full model
+    full_model_path = str(model_path).replace(".pt", "_full.pt")
+    torch.save(model, full_model_path)
+
     # export the model to onnx
-    # onnx_model_path = os.path.join(run_path, f"model_{time_str}.onnx")
-    # print(onnx_model_path)
-    # dummy_input = torch.rand(1, INPUT_SIZE)
-    # torch.onnx.export(model,
-    #                   dummy_input,
-    #                   onnx_model_path,
-    #                   )
+    onnx_model_path = os.path.join(run_path, f"model_{time_str}.onnx")
+    print(f"ONNX Model Path: {onnx_model_path}")
+    dummy_input = torch.randn(1, 3, INPUT_SIZE[0], INPUT_SIZE[1])
+    torch.onnx.export(model,
+                      (dummy_input),
+                      onnx_model_path)
+    
+    print("Checking onnx Model for errors")
+    onnx_model = onnx.load(onnx_model_path)
+    onnx_model = onnxslim.slim(onnx_model)
+    onnx.checker.check_model(onnx_model)
 
     # save loss file
     loss_path = os.path.join(run_path, "loss.json")
