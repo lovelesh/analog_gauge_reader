@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 from scipy import odr
 
+INPUT_SIZE = (448, 448)
 
 def segment_gauge_needle(image, model_path='best.pt'):
     """
@@ -11,9 +12,10 @@ def segment_gauge_needle(image, model_path='best.pt'):
     :param model_path: path to yolov8 segmentation model
     :return: segmentation of needle
     """
-    model = YOLO(model_path)  # load model
+    task = "segment"
+    model = YOLO(model_path, task=task)  # load model
 
-    results = model.predict(image)  # run inference, detects gauge face and needle
+    results = model.predict(image, imgsz=INPUT_SIZE)  # run inference, detects gauge face and needle
 
     # get list of detected boxes, already sorted by confidence
     try:

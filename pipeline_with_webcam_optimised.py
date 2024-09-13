@@ -192,7 +192,7 @@ def process_image(image, detection_model_path, key_point_model_path,
 
             logging.info("Start key point detection")
 
-            key_point_inferencer = KeyPointInference(key_point_model_path, optimized=True)
+            key_point_inferencer = KeyPointInference(key_point_model_path, optimized=False)
             heatmaps = key_point_inferencer.predict_heatmaps(cropped_resized_img)
             key_point_list = detect_key_points(heatmaps)
 
@@ -501,8 +501,8 @@ def main():
     if input_path.isdigit():
         index = int(input_path)
         cap = cv2.VideoCapture(index)
-        # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
-        # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1024)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1024)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         # cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
 
@@ -626,8 +626,7 @@ def read_args():
     parser.add_argument('--detection_model',
                         type=str,
                         required=False,
-                        default="models/gauge_detection_model_custom_trained_saved_model/\
-                            gauge_detection_model_custom_trained_full_integer_quant_edgetpu.tflite",
+                        default="models/gauge_detection_model_custom_trained_saved_model_1024/gauge_detection_model_custom_trained_full_integer_quant_edgetpu.tflite",
                         help="Path to detection model")
     parser.add_argument('--key_point_model',
                         type=str,
@@ -637,8 +636,7 @@ def read_args():
     parser.add_argument('--segmentation_model',
                         type=str,
                         required=False,
-                        default="models/segmentation_model_custom_trained_saved_model/\
-                            segmentation_model_custom_trained_full_integer_quant_edgetpu.tflite",
+                        default="models/segmentation_model_custom_trained_saved_model_448/segmentation_model_custom_trained_full_integer_quant_edgetpu.tflite",
                         help="Path to segmentation model")
     parser.add_argument('--base_path',
                         type=str,

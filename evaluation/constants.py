@@ -4,6 +4,7 @@ RESULT_FULL_FILE_NAME = "result_full.json"
 ERROR_FILE_NAME = "error.json"
 
 ORIGINAL_IMG_FILE_NAME = "original_image.jpg"
+ORIGINAL_IMG_SIZE = 1024
 
 # Keys in Json Files-------------------------------------------------
 ID_KEY = "id"

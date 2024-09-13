@@ -1,5 +1,5 @@
 from ultralytics import YOLO
-
+from evaluation import constants
 
 def   detection_gauge_face(img, model_path='best.pt', conf=0.25):
     '''
@@ -8,10 +8,11 @@ def   detection_gauge_face(img, model_path='best.pt', conf=0.25):
     :param model_path: path to yolov8 detection model
     :return: highest confidence box for further processing and list of all boxes for visualization
     '''
-    model = YOLO(model_path)  # load model
+    task = "detect"
+    model = YOLO(model_path, task=task)  # load model
 
     # results = model(img)  # run inference, detects gauge face and needle
-    results = model.predict(img, conf=conf)
+    results = model.predict(img, conf=conf, imgsz=constants.ORIGINAL_IMG_SIZE)
 
     # get list of detected boxes, already sorted by confidence
     boxes = results[0].boxes
