@@ -1,6 +1,5 @@
 from torch import nn
 import torch
-import onnxruntime as ort
 
 ENCODER_MODEL_NAME = 'dinov2_vits14'
 
@@ -73,8 +72,4 @@ def load_model(model_path):
 
     model = EncoderDecoder(encoder, decoder)
     model.load_state_dict(torch.load(model_path))
-    return model
-
-def load_optimized_model(model_path):
-    model = ort.InferenceSession(model_path, providers=ort.get_available_providers())
     return model

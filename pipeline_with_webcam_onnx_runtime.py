@@ -9,8 +9,8 @@ import numpy as np
 from PIL import Image
 
 from plots import RUN_PATH, Plotter
-from gauge_detection.detection_inference import detection_gauge_face, find_center_bbox
-from key_point_detection.key_point_inference import KeyPointInference, detect_key_points
+from gauge_detection.detection_inference_onnx import detection_gauge_face, find_center_bbox
+from key_point_detection.key_point_inference_onnx import KeyPointInference, detect_key_points
 from geometry.ellipse import fit_ellipse, cart_to_pol, get_line_ellipse_point, \
     get_point_from_angle, get_polar_angle, get_theta_middle, get_ellipse_error
 from angle_reading_fit.angle_converter import AngleConverter
@@ -143,7 +143,7 @@ def process_image(image, detection_model_path, key_point_model_path,
 
     logging.info("Start Gauge Detection")
 
-    all_boxes = detection_gauge_face(image, detection_model_path, conf=0.25, optimized=False)
+    all_boxes = detection_gauge_face(image, detection_model_path, conf=0.25)
 
     if debug:
         plotter.plot_bounding_box_img(all_boxes)
@@ -192,9 +192,9 @@ def process_image(image, detection_model_path, key_point_model_path,
 
             logging.info("Start key point detection")
 
-            key_point_inferencer = KeyPointInference(key_point_model_path, optimized=True)
+            key_point_inferencer = KeyPointInference(key_point_model_path)
             # print(f"type: {type(cropped_resized_img)}")
-            heatmaps = key_point_inferencer.predict_heatmaps(cropped_resized_img, optimized=True)
+            heatmaps = key_point_inferencer.predict_heatmaps(cropped_resized_img)
             key_point_list = detect_key_points(heatmaps)
 
             key_points = key_point_list[1]
