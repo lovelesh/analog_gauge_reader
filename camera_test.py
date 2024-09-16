@@ -98,7 +98,7 @@ def read_json_file(filename):
 
 def main():
     # Open the camera (0 is typically the default camera) 
-    cap = cv2.VideoCapture(0) 
+    cap = cv2.VideoCapture(4) 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
     # cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
@@ -127,7 +127,7 @@ def main():
         # Show the frame 
         if success:
             image = np.asarray(frame)
-            box, all_boxes = detection_gauge_face(image, model_path='models/gauge_detection_model_custom_trained.pt', conf=0.25)
+            all_boxes = detection_gauge_face(image, model_path='models/gauge_detection_model_custom_trained.onnx', conf=0.25)
             # for r in results:
             #     print(r.boxes)
             
@@ -150,7 +150,7 @@ def main():
                     pass
 
             # Set callback for mouse events
-            cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+            cv2.namedWindow(WINDOW_NAME)
             # cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
             cv2.setMouseCallback(WINDOW_NAME, capture_xy)
             cv2.imshow(WINDOW_NAME, frame) 

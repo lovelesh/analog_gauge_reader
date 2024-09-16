@@ -13,14 +13,14 @@ def full_key_point_extraction(heatmaps, threshold=0.5, bandwidth=20):
         # print(f"iter: {i}")
         # middle
         if i == 1:
-            # print("extracting middle")
+            print("extracting middle")
             cluster_centers = extract_key_points(heatmaps[i], threshold,
                                                  bandwidth)
             key_point_list.append(cluster_centers)
             # print(key_point_list)
         # start and end
         else:
-            # print("extracting start and end")
+            print("extracting start and end")
             cluster_center = extract_start_end_points(heatmaps[i], threshold)
             key_point_list.append(cluster_center)
     return key_point_list
