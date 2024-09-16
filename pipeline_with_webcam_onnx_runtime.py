@@ -143,9 +143,6 @@ def process_image(image, detection_model_path, key_point_model_path,
 
     logging.info("Start Gauge Detection")
 
-    # image = cv2.resize(image, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
-    # print(f"original image size: {image.shape}")
-
     all_boxes = detection_gauge_face(image, detection_model_path, conf=0.25, optimized=False)
 
     if debug:
@@ -540,6 +537,8 @@ def main():
             all_boxes = []
             gauge_readings = []
 
+            frame = cv2.resize(frame, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
+            print(f"original image size: {frame.shape}")
             # try:
             gauge_readings, all_boxes = process_image(frame,
                                         detection_model,

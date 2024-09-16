@@ -31,7 +31,7 @@ class KeyPointInference:
         img = Image.fromarray(image)
         image_t = custom_transforms(train=False, image=img)
         image_t = image_t.unsqueeze(0)
-        print(f"image shape: {image_t.shape}")
+        # print(f"image shape: {image_t.shape}")
 
         if not optimized:
             heatmaps = self.model(image_t)
@@ -60,7 +60,7 @@ def detect_key_points(heatmaps):
         list: List of keypoints
     """
     key_point_list = full_key_point_extraction(heatmaps, 0.6)
-    print(f"key point list shape: {type(key_point_list)} {len(key_point_list)}")
+    # print(f"key point list shape: {type(key_point_list)} {len(key_point_list)}")
 
     return key_point_list
 
