@@ -502,8 +502,8 @@ def main():
     if input_path.isdigit():
         index = int(input_path)
         cap = cv2.VideoCapture(index)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
+        # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         # cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
 
@@ -519,6 +519,8 @@ def main():
             wait_time = 20
         # Loop through Video Frames
         while cap.isOpened():
+
+            start = time.time()
             # Read a frame from video
             success, frame = cap.read()
             # image = np.asarray(frame)
@@ -539,45 +541,50 @@ def main():
 
             frame = cv2.resize(frame, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
             print(f"original image size: {frame.shape}")
-            # try:
-            gauge_readings, all_boxes = process_image(frame,
-                                        detection_model,
-                                        key_point_model,
-                                        segmentation_model,
-                                        run_path,
-                                        debug=args.debug,
-                                        eval_mode=args.eval,
-                                        image_is_raw=True)
-            # print(f"All boxes: {all_boxes}")
-            print(f"Gauge Readings: {gauge_readings}")
-            # box, all_boxes, results = detection_gauge_face(image, detection_model)
+            try:
+                gauge_readings, all_boxes = process_image(frame,
+                                            detection_model,
+                                            key_point_model,
+                                            segmentation_model,
+                                            run_path,
+                                            debug=args.debug,
+                                            eval_mode=args.eval,
+                                            image_is_raw=True)
+                # print(f"All boxes: {all_boxes}")
+                print(f"Gauge Readings: {gauge_readings}")
+                # box, all_boxes, results = detection_gauge_face(image, detection_model)
                 
-            # except Exception as err:
-            #     err_msg = f"Unexpected {err=}, {type(err)=}"
-            #     print(err_msg)
-            #     logging.error(err_msg)
+            except Exception as err:
+                err_msg = f"Unexpected {err=}, {type(err)=}"
+                print(err_msg)
+                logging.error(err_msg)
 
-            # finally:
-            # Set format for the overlay
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.8
-            box_color = (0, 255, 0)
-            text_color = (0, 0, 255)
-            box_thickness = 2
-            text_thickness = 2
-
-            # Overlay text on captured image
-            for (box, gauge_reading) in zip(all_boxes, gauge_readings):
-                cv2.rectangle(frame, (int(box[0]), int(box[1])),
-                                (int(box[2]), int(box[3])), box_color, box_thickness)
-                cv2.putText(frame, f"#{gauge_reading[constants.ID_KEY]} {gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
-                            (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
             
-            # Set callback for mouse events
-            cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-            cv2.setMouseCallback(WINDOW_NAME, capture_xy)
-            # Display the frame
-            cv2.imshow(WINDOW_NAME, frame)
+            finally:
+                # Set format for the overlay
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.8
+                box_color = (0, 255, 0)
+                text_color = (0, 0, 255)
+                box_thickness = 2
+                text_thickness = 2
+
+                # Overlay text on captured image
+                for (box, gauge_reading) in zip(all_boxes, gauge_readings):
+                    cv2.rectangle(frame, (int(box[0]), int(box[1])),
+                                    (int(box[2]), int(box[3])), box_color, box_thickness)
+                    cv2.putText(frame, f"#{gauge_reading[constants.ID_KEY]} {gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
+                                (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
+                
+                end = time.time()
+                inference_time = np.round(end - start, 2)
+                print(f"Inference time: {inference_time} seconds")
+            
+                # Set callback for mouse events
+                cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+                cv2.setMouseCallback(WINDOW_NAME, capture_xy)
+                # Display the frame
+                cv2.imshow(WINDOW_NAME, frame)
 
             key = cv2.waitKey(wait_time)  & 0xFF
             if key == ord('r'):

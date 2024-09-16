@@ -1,6 +1,6 @@
 from ultralytics import YOLO
 from evaluation import constants
-import onnxruntime as ort
+# import onnxruntime as ort
 import numpy as np
 
 def   detection_gauge_face(img, model_path='yolov8n.pt', conf=0.25, optimized=False):
@@ -14,7 +14,6 @@ def   detection_gauge_face(img, model_path='yolov8n.pt', conf=0.25, optimized=Fa
     if not optimized:
         task = "detect"
         model = YOLO(model_path, task=task)  # load model
-        # results = model(img)  # run inference, detects gauge face and needle
         results = model.predict(img, conf=conf)     # , imgsz=constants.ORIGINAL_IMG_SIZE)
         # print(results[0])
     # else:
