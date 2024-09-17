@@ -98,9 +98,9 @@ def read_json_file(filename):
 
 def main():
     # Open the camera (0 is typically the default camera) 
-    cap = cv2.VideoCapture(4) 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
+    cap = cv2.VideoCapture(2) 
+    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
+    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
     # cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
     # cap.set(cv2.CAP_PROP_FOCUS, 20)
     # focus_value = 0  # Example focus value
@@ -127,7 +127,7 @@ def main():
         # Show the frame 
         if success:
             image = np.asarray(frame)
-            all_boxes = detection_gauge_face(image, model_path='models/gauge_detection_model_custom_trained.onnx', conf=0.25)
+            all_boxes = detection_gauge_face(image, model_path='models/gauge_detection_model_custom_trained_saved_model_640/gauge_detection_model_custom_trained_full_integer_quant_edgetpu.tflite', conf=0.25)
             # for r in results:
             #     print(r.boxes)
             
