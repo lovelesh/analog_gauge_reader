@@ -141,3 +141,4 @@ yolov8?-seg.pt
 /input
 /results
 metadata.json
+/logs

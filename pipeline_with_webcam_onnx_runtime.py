@@ -41,6 +41,8 @@ OCR_ROTATION = RANDOM_ROTATIONS or ZERO_POINT_ROTATION
 
 WINDOW_NAME = "Gauge Reading"
 
+MAX_ITERATIONS = 3
+avg_gauge_readings = []
 
 def crop_image(img, box, flag=False, two_dimensional=False):
     """
@@ -466,6 +468,11 @@ def capture_xy(action, x, y, flags, *userdata):
     if action == cv2.EVENT_LBUTTONDBLCLK:
         metadata.save_metadata(x, y)         
 
+def get_gauge_index(id):
+    for index in range(len(avg_gauge_readings)):
+        if (avg_gauge_readings[index][constants.ID_KEY] == id):
+            return index
+
 def main():
     args = read_args()
 
@@ -492,15 +499,32 @@ def main():
                         level=logging.INFO)
     
     try:
-        metadata.meter_config = read_json_file(metadata_path)
+        metadata_recv = read_json_file(metadata_path)
+        camera_id = metadata_recv["camera_id"]
+        metadata.meter_config = metadata_recv["meter_config"]
         if args.debug:
-            print(f"Read METER Data: {metadata.meter_config}")
+            print(f"Camera ID: {camera_id}")
+            print(f"METER Data: {metadata.meter_config}")
     except:
         print("No metadata file found")
         pass
 
-    if input_path.isdigit():
+    if args.run:
+        index = camera_id    
+        for index in range(len(metadata.meter_config)):
+            avg_gauge_readings.append({
+                    constants.ID_KEY: metadata.meter_config[index]["id"],
+                    constants.READING_KEY: 0,
+                    constants.MEASURE_UNIT_KEY: metadata.meter_config[index]["unit"]
+                })
+        print(f"Final reading list: {avg_gauge_readings}")
+    elif input_path is not None:
         index = int(input_path)
+    else:
+        print("Error: Enter correct Camera index")
+        logging.error("Invalid camera index")
+
+    if index is not None:
         cap = cv2.VideoCapture(index)
         # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
@@ -517,6 +541,7 @@ def main():
             wait_time = 0
         else:
             wait_time = 20
+
         # Loop through Video Frames
         while cap.isOpened():
 
@@ -575,6 +600,10 @@ def main():
                                     (int(box[2]), int(box[3])), box_color, box_thickness)
                     cv2.putText(frame, f"#{gauge_reading[constants.ID_KEY]} {gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
                                 (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
+                    gauge_index = get_gauge_index(gauge_reading[constants.ID_KEY])
+                    avg_gauge_readings[gauge_index][constants.READING_KEY] = (avg_gauge_readings[gauge_index][constants.READING_KEY] + 
+                                                                              gauge_reading[constants.READING_KEY]) / 2
+                print(f"Avg list: {avg_gauge_readings}")
                 
                 end = time.time()
                 inference_time = np.round(end - start, 2)
@@ -598,12 +627,15 @@ def main():
                     print(f"Current METER Data: {metadata.meter_config}")
             
             elif key == ord('s'):
-                write_json_file(metadata_path, metadata.meter_config)
+                dictionary = { "camera_id": index, "meter_config": metadata.meter_config}
+                wite_json_file(metadata_path, dictionary)
                 if args.debug:
-                    print(f"Saving METER Data: {metadata.meter_config}")
+                    print(f"Saving Metadata: {dictionary}")
                 
             elif key == ord('o'):
-                metadata.meter_config = read_json_file(metadata_path)
+                dictionary = read_json_file(metadata_path)
+                camera_id = dictionary["camera_id"]
+                metadata.meter_config = dictionary["meter_config"]
                 if args.debug:
                     print(f"Read METER Data: {metadata.meter_config}")
 
@@ -621,7 +653,6 @@ def main():
         # Release the video capture object and close the display window
         cap.release()
         cv2.destroyAllWindows()
-
     else:
         print("Error: Enter correct Camera index")
         logging.error("Invalid camera index")
@@ -631,7 +662,8 @@ def read_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input',
                         type=str,
-                        required=True,
+                        required=False,
+                        default=0,
                         help="Enter the index of camera input")
     parser.add_argument('--detection_model',
                         type=str,
@@ -660,6 +692,7 @@ def read_args():
                         help="Path to metadata file")
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--eval', action='store_true')
+    parser.add_argument('--run', action='store_true')
     return parser.parse_args()
 
 
