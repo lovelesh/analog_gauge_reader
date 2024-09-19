@@ -1,5 +1,5 @@
 from easygui import *
-
+from pipeline_with_webcam_onnx_runtime import read_json_file, write_json_file
 # Gauge metadata
 
 meter_config = []
@@ -34,7 +34,7 @@ def get_gauge_details(box):
     print("no Gauge details found")
     raise Exception("no Gauge details found")
 
-def save_metadata(x, y):
+def save_meter_data(x, y):
     title = "Meter Metadata"
     msg = "Enter metadata for the Gauge"
     fieldNames = ["Name", "ID", "Start", "End", "Unit"]
@@ -59,4 +59,13 @@ def save_metadata(x, y):
         })
         # print(meter_config)
         return True
-      
+
+def read_metadata(metadata_file_path):
+    dictionary = read_json_file(metadata_file_path)
+    camera_id = dictionary["camera_id"]
+    meter_configuration = dictionary["meter_config"]
+    return camera_id, meter_configuration
+
+def write_metadata(camera_id, meter_configuration, metadata_file_path):
+    dictionary = { "camera_id": camera_id, "meter_config": meter_configuration}
+    write_json_file(metadata_file_path, dictionary)
