@@ -4,10 +4,15 @@ from gauge_detection.detection_inference import detection_gauge_face, find_cente
 import metadata
 from easygui import *
 import json
+import os
+import subprocess
+import time
 
 # egdemo()
 
 WINDOW_NAME = "Webcam Feed"
+CAMERA_NAME = "HD USB Camera"
+# CAMERA_NAME = "HD Pro Webcam"
 
 # meter_index = 0
 
@@ -70,6 +75,38 @@ WINDOW_NAME = "Webcam Feed"
 #         })
 #         print(meter_config)
 #         return True
+
+def autoAdjustments(img):
+    # create new image with the same size and type as the original image
+    new_img = np.zeros(img.shape, img.dtype)
+
+    # calculate stats
+    alow = img.min()
+    ahigh = img.max()
+    amax = 255
+    amin = 0
+
+    # access each pixel, and auto adjust
+    for x in range(img.shape[0]):
+        for y in range(img.shape[1]):
+            a = img[x, y]
+            new_img[x, y] = amin + (a - alow) * ((amax - amin) / (ahigh - alow))
+
+    return new_img
+
+def autoAdjustments_with_convertScaleAbs(img):
+    alow = img.min()
+    ahigh = img.max()
+    amax = 255
+    amin = 0
+
+    # calculate alpha, beta
+    alpha = ((amax - amin) / (ahigh - alow))
+    beta = amin - alow * alpha
+    # perform the operation g(x,y)= α * f(x,y)+ β
+    new_img = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
+
+    return [new_img, alpha, beta]
       
     
 
@@ -98,10 +135,16 @@ def read_json_file(filename):
 
 def main():
     # Open the camera (0 is typically the default camera) 
-    cap = cv2.VideoCapture(4) 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
-    # cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+    command = f"v4l2-ctl --list-devices | grep '{CAMERA_NAME}' -A4 | sed -n '2p' | xargs"
+    index = subprocess.getstatusoutput(command)[1]
+    print(f"index is {index}")
+
+    cap = cv2.VideoCapture(index)
+    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
+    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 20)
+    cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     # cap.set(cv2.CAP_PROP_FOCUS, 20)
     # focus_value = 0  # Example focus value
     # zoom_value = 0 
@@ -115,7 +158,12 @@ def main():
         # print(f"Focus: {focus_value}")
         # print(f"zoom : {zoom_value}")
         # cap.set(cv2.CAP_PROP_ZOOM, zoom_value) 
-        success, frame = cap.read()        
+        success, frame_out = cap.read()        
+        frame = autoAdjustments(frame_out)
+
+        [frame, alpha, beta] = autoAdjustments_with_convertScaleAbs(frame_out)
+
+        print(f"aplha: {alpha}, beta: {beta}")
 
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.8
@@ -143,7 +191,7 @@ def main():
                 try: 
                     gauge_index = metadata.get_gauge_details(box)
                     print(f"Gauge Details: {gauge_index} {metadata.meter_config[gauge_index]}")
-                    cv2.putText(frame, f"#{index} #{metadata.meter_config[gauge_index]['id']} {metadata.meter_config[gauge_index]['name']} {metadata.meter_config[gauge_index]['end']} {metadata.meter_config[gauge_index]['unit']}",
+                    cv2.putText(frame, f"#{index} #{metadata.meter_config[gauge_index]['id']} {metadata.meter_config[gauge_index]['name']}",
                                 find_center_bbox(box), font, font_scale, text_color, text_thickness)
                     
                 except :
