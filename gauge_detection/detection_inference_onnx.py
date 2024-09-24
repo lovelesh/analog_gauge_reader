@@ -3,7 +3,7 @@ from evaluation import constants
 # import onnxruntime as ort
 import numpy as np
 
-def   detection_gauge_face(img, model_path='yolov8n.pt', conf=0.25, optimized=False):
+def detection_gauge_face(img, model_path='yolov8n.pt', conf=0.25, optimized=False):
     '''
     uses yolo v8 to get bounding box of gauge face
     :param img: numpy image

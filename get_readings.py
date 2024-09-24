@@ -3,6 +3,7 @@ import os
 import logging
 import time
 import json
+import subprocess
 
 import cv2
 import numpy as np
@@ -17,8 +18,6 @@ from angle_reading_fit.angle_converter import AngleConverter
 from angle_reading_fit.line_fit import line_fit, line_fit_ransac
 from segmentation.segmenation_inference import get_start_end_line, segment_gauge_needle, \
     get_fitted_line, cut_off_line
-# pylint: disable=no-name-in-module
-# pylint: disable=no-member
 from evaluation import constants
 import metadata
 import cloud.http_client as http_client
@@ -45,6 +44,8 @@ ZERO_POINT_ROTATION = True
 OCR_ROTATION = RANDOM_ROTATIONS or ZERO_POINT_ROTATION
 
 WINDOW_NAME = "Gauge Reading"
+CAMERA_NAME = "HD USB Camera"
+# CAMERA_NAME = "HD Pro Webcam"
 
 MAX_ITERATIONS = 3
 avg_gauge_readings = []
@@ -478,10 +479,9 @@ def get_gauge_index(id):
         if (avg_gauge_readings[index][constants.ID_KEY] == id):
             return index
 
-def main():
+def get_gauge_readings(args):
     start_time = time.time()
-    args = read_args()
-
+    # extract arguments
     input_path = args.input
     detection_model = args.detection_model
     key_point_model = args.key_point_model
@@ -512,10 +512,12 @@ def main():
             print(f"METER Data: {metadata.meter_config}")
     except:
         print("No metadata file found")
-        pass
+        command = f"v4l2-ctl --list-devices | grep '{CAMERA_NAME}' -A4 | sed -n '2p' | xargs"
+        index = subprocess.getstatusoutput(command)[1]
+        print(f"index is {index}")
 
     if run:
-        index = camera_id 
+        index = camera_id # check if this command is needed 
         for meter in range(len(metadata.meter_config)):
             avg_gauge_readings.append({
                     constants.ID_KEY: metadata.meter_config[meter]["id"],
@@ -528,85 +530,75 @@ def main():
     else:
         print("Error: Enter correct Camera index")
         logging.error("Invalid camera index")
+        return False
 
-    if index is not None:
+    if index is not None: 
         cap = cv2.VideoCapture(index)
         # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         # cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
-
-        time.sleep(1)
-
-        image_base_name = "webcam"
-        
-        iter_count = 0
-        # Break the loop if q is pressed
-        if args.debug:
-            wait_time = 0   # for user interactive mechanism
-        else:
-            wait_time = 20 # for automatic running
-
+        # iter = 0
         # Loop through Video Frames
-        while cap.isOpened():
-            # Start Timer for inference
-            iter_start_time = time.time()
-            # Read a frame from video
-            success, frame = cap.read()
+        if cap.isOpened():
+            for i in range(3):
+                # Start Timer for inference
+                iter_start_time = time.time()
+                # Read a frame from video
+                success, frame = cap.read()
 
-            if not success:
-                break
-            # Process the image with the pipeline
-            print("processing the image")
-            if args.debug:
-                image_name = f"{image_base_name}_{iter_count}"
-            else:
-                image_name = image_base_name
-            run_path = os.path.join(base_path, image_name)
+                if not success:
+                    return None
 
-            all_boxes = []
-            gauge_readings = []
+                image_base_name = "webcam"
 
-            frame = cv2.resize(frame, dsize=IMAGE_SIZE, interpolation=cv2.INTER_CUBIC)
-            if args.debug:
-                print(f"original image size: {frame.shape}")
+                if args.debug:
+                    image_name = f"{image_base_name}_{i}"
+                else:
+                    image_name = image_base_name
+                run_path = os.path.join(base_path, image_name)
+                all_boxes = []
+                gauge_readings = []
 
-            try:
-                gauge_readings, all_boxes = process_image(frame,
-                                            detection_model,
-                                            key_point_model,
-                                            segmentation_model,
-                                            run_path,
-                                            debug=args.debug,
-                                            eval_mode=args.eval,
-                                            image_is_raw=True)
-                # print(f"All boxes: {all_boxes}")
-                print(f"Gauge Readings: {gauge_readings}")
-                # box, all_boxes, results = detection_gauge_face(image, detection_model)
+                frame = cv2.resize(frame, dsize=IMAGE_SIZE, interpolation=cv2.INTER_CUBIC)
+                if args.debug:
+                    print(f"original image size: {frame.shape}")
+
+                try:
+                    gauge_readings, all_boxes = process_image(frame,
+                                                detection_model,
+                                                key_point_model,
+                                                segmentation_model,
+                                                run_path,
+                                                debug=args.debug,
+                                                eval_mode=args.eval,
+                                                image_is_raw=True)
+                    # print(f"All boxes: {all_boxes}")
+                    print(f"Gauge Readings: {gauge_readings}")
+                    # box, all_boxes, results = detection_gauge_face(image, detection_model)
+                    
+                except Exception as err:
+                    err_msg = f"Unexpected {err=}, {type(err)=}"
+                    print(err_msg)
+                    logging.error(err_msg)
                 
-            except Exception as err:
-                err_msg = f"Unexpected {err=}, {type(err)=}"
-                print(err_msg)
-                logging.error(err_msg)
+                finally:
+                    # Set format for the overlay
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    font_scale = 0.8
+                    box_color = (0, 255, 0)
+                    text_color = (0, 0, 255)
+                    box_thickness = 2
+                    text_thickness = 2
 
-            
-            finally:
-                # Set format for the overlay
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.8
-                box_color = (0, 255, 0)
-                text_color = (0, 0, 255)
-                box_thickness = 2
-                text_thickness = 2
-
-                # Overlay text on captured image
-                for (box, gauge_reading) in zip(all_boxes, gauge_readings):
-                    cv2.rectangle(frame, (int(box[0]), int(box[1])),
-                                    (int(box[2]), int(box[3])), box_color, box_thickness)
-                    cv2.putText(frame, f"#{gauge_reading[constants.ID_KEY]} {gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
-                                (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
-                    if run:
-                        if iter_count < MAX_ITERATIONS:
+                    # Overlay text on captured image
+                    for (box, gauge_reading) in zip(all_boxes, gauge_readings):
+                        cv2.rectangle(frame, (int(box[0]), int(box[1])),
+                                        (int(box[2]), int(box[3])), box_color, box_thickness)
+                        cv2.putText(frame, f"#{gauge_reading[constants.ID_KEY]} {gauge_reading[constants.READING_KEY]:.2f} {gauge_reading[constants.MEASURE_UNIT_KEY]}",
+                                    (int(box[0]), int(box[1]) + 25), font, font_scale, text_color, text_thickness)
+                        if run:
+                            # if i < MAX_ITERATIONS:
                             if (gauge_reading[constants.ID_KEY] == constants.ID_FAILED) or (gauge_reading[constants.READING_KEY] == constants.READING_FAILED):
                                 continue
                             gauge_index = get_gauge_index(gauge_reading[constants.ID_KEY])
@@ -615,75 +607,87 @@ def main():
                             else:
                                 avg_gauge_readings[gauge_index][constants.READING_KEY] = (avg_gauge_readings[gauge_index][constants.READING_KEY] + 
                                                                                     gauge_reading[constants.READING_KEY]) / 2
-
                 iter_end_time = time.time()
                 iter_inference_time = np.round(iter_end_time - iter_start_time, 2)
-                print(f"Inference time: {iter_inference_time} seconds")
+                print(f"Iteration Inference Time: {iter_inference_time} seconds")
+                print("--------------------Inference complete--------------------------")
             
-            if args.debug:
-                # Set callback for mouse events
-                cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-                cv2.setMouseCallback(WINDOW_NAME, capture_xy)
-                # Display the frame
-                cv2.imshow(WINDOW_NAME, frame)
-
-                key = cv2.waitKey(wait_time)  & 0xFF
-                if key == ord('r'):
-                    metadata.meter_config.clear()
-                    if args.debug:
-                        print("Metadata resetted")
-                        print(metadata.meter_config)
-
-                elif key == ord('d'):
-                    if args.debug:
-                        print(f"Current METER Data: {metadata.meter_config}")
-                
-                elif key == ord('s'):
-                    metadata.write_metadata(index, metadata.meter_config, metadata_path)
-                    if args.debug:
-                        print(f"Saving Metadata...")
-                    
-                elif key == ord('o'):
-                    index, metadata.meter_config = metadata.read_metadata(metadata_path)
-                    if args.debug:
-                        print(f"Read Metadata: {metadata.meter_config}")
-
-                elif key == ord('c'):
-                    wait_time = 0
-
-                elif key == ord('v'):
-                    wait_time = 20
-                
-                elif key == ord('q'):
-                    break
-            
+            end_time = time.time()
+            total_inference_time = np.round(end_time - start_time, 2)
+            print(f"Run time: {total_inference_time} seconds")
             if run:            
                 print(f"Avg readings: {avg_gauge_readings}")
-                if iter_count == MAX_ITERATIONS:
-                    print(f"Final Avg readings: {avg_gauge_readings}")
-                    image_path = os.path.join(base_path, "image.jpg")
-                    cv2.imwrite(image_path, frame)
-                    print(f"Image saved at {image_path}")
-                    # check if server is on
-                    if http_client.get_data_from_server():
-                        print("Sending data to server")
-                        end_time = time.time()
-                        run_time = np.round(end_time - start_time, 2)
-                        print(f"Run time: {run_time} seconds")
-                        http_client.send_data_to_server(avg_gauge_readings, frame, run_time)
-                    else:
-                        print("server is off")
-                    break
-            print("--------------------Inference complete--------------------------")
-            iter_count += 1
-        # Release the video capture object and close the display window
+                # if iter == MAX_ITERATIONS:
+                print(f"Final Avg readings: {avg_gauge_readings}")
+                image_path = os.path.join(base_path, "image.jpg")
+                cv2.imwrite(image_path, frame)
+                print(f"Image saved at {image_path}")
+                # check if server is on
+                if http_client.get_data_from_server():
+                    print("Sending data to server")
+                    http_client.send_data_to_server(avg_gauge_readings, frame, total_inference_time)
+                else:
+                    print("server is off")
+                # break
+            return frame, total_inference_time, index
         cap.release()
-        cv2.destroyAllWindows()
-
+        # cv2.destroyAllWindows()    
+        print("Could not open camera")
+        return None
     else:
         print("Error: Enter correct Camera index")
         logging.error("Invalid camera index")
+        return None
 
+
+def main():
+    args = read_args()
+    while True:
+        frame, total_inference_time, camera_index = get_gauge_readings(args)
+        
+        # Break the loop if q is pressed
+        if args.debug:
+            wait_time = 0   # for user interactive mechanism
+        else:
+            wait_time = 20 # for automatic running
+            
+        if args.debug:
+            # Set callback for mouse events
+            cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+            cv2.setMouseCallback(WINDOW_NAME, capture_xy)
+            # Display the frame
+            cv2.imshow(WINDOW_NAME, frame)
+
+            key = cv2.waitKey(wait_time)  & 0xFF
+            if key == ord('r'):
+                metadata.meter_config.clear()
+                if args.debug:
+                    print("Metadata resetted")
+                    print(metadata.meter_config)
+
+            elif key == ord('d'):
+                if args.debug:
+                    print(f"Current METER Data: {metadata.meter_config}")
+            
+            elif key == ord('s'):
+                metadata.write_metadata(camera_index, metadata.meter_config, args.metadata)
+                if args.debug:
+                    print(f"Saving Metadata...")
+                
+            elif key == ord('o'):
+                index, metadata.meter_config = metadata.read_metadata(args.metadata)
+                if args.debug:
+                    print(f"Read Metadata: {metadata.meter_config}")
+
+            elif key == ord('c'):
+                wait_time = 0
+
+            elif key == ord('v'):
+                wait_time = 20
+            
+            elif key == ord('q'):
+                cv2.destroyAllWindows()
+                break
 
 def read_args():
     parser = argparse.ArgumentParser()

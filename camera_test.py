@@ -115,7 +115,7 @@ def capture_xy(action, x, y, flags, *userdata):
 
     if action == cv2.EVENT_LBUTTONDBLCLK:
         # print(f"Meter Metadata: {meter_config[meter_index]}")
-        metadata.save_metadata(x, y)
+        metadata.save_meter_data(x, y)
         # write_json_file(userdata[0], meter_config)
 
 
@@ -135,10 +135,10 @@ def read_json_file(filename):
 
 def main():
     # Open the camera (0 is typically the default camera) 
-    command = f"v4l2-ctl --list-devices | grep '{CAMERA_NAME}' -A4 | sed -n '2p' | xargs"
-    index = subprocess.getstatusoutput(command)[1]
-    print(f"index is {index}")
-
+    # command = f"v4l2-ctl --list-devices | grep '{CAMERA_NAME}' -A4 | sed -n '2p' | xargs"
+    # index = subprocess.getstatusoutput(command)[1]
+    # print(f"index is {index}")
+    index = 0
     cap = cv2.VideoCapture(index)
     # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
     # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)

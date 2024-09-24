@@ -1,5 +1,6 @@
 from easygui import *
-from pipeline_with_webcam_onnx_runtime import read_json_file, write_json_file
+from get_readings import read_json_file, write_json_file
+# from pipeline_with_webcam_onnx_runtime import read_json_file, write_json_file
 # Gauge metadata
 
 meter_config = []
