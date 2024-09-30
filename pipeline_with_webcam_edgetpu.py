@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 
 from plots import RUN_PATH, Plotter
-from gauge_detection.detection_inference_onnx_edgetpu import detection_gauge_face, find_center_bbox
+from gauge_detection.detection_inference_edgetpu import detection_gauge_face, find_center_bbox
 from key_point_detection.key_point_inference_onnx import KeyPointInference, detect_key_points
 from geometry.ellipse import fit_ellipse, cart_to_pol, get_line_ellipse_point, \
     get_point_from_angle, get_polar_angle, get_theta_middle, get_ellipse_error
@@ -21,6 +21,12 @@ from segmentation.segmenation_inference_edgetpu import get_start_end_line, segme
 # pylint: disable=no-member
 from evaluation import constants
 import metadata
+
+#Pycoral API
+from pycoral.adapters import common
+from pycoral.adapters import detect
+from pycoral.utils.edgetpu import list_edge_tpus
+
 
 OCR_THRESHOLD = 0.7
 RESOLUTION = (
@@ -186,98 +192,98 @@ def process_image(image, detection_model_path, key_point_model_path,
 
             # ------------------Key Point Detection-------------------------
 
-            if debug:
-                print("-------------------")
-                print("Key Point Detection")
+            # if debug:
+            #     print("-------------------")
+            #     print("Key Point Detection")
 
-            logging.info("Start key point detection")
+            # logging.info("Start key point detection")
 
-            key_point_inferencer = KeyPointInference(key_point_model_path)
-            # print(f"type: {type(cropped_resized_img)}")
-            heatmaps = key_point_inferencer.predict_heatmaps(cropped_resized_img)
-            key_point_list = detect_key_points(heatmaps)
+            # key_point_inferencer = KeyPointInference(key_point_model_path)
+            # # print(f"type: {type(cropped_resized_img)}")
+            # heatmaps = key_point_inferencer.predict_heatmaps(cropped_resized_img)
+            # key_point_list = detect_key_points(heatmaps)
 
-            key_points = key_point_list[1]
-            start_point = key_point_list[0]
-            end_point = key_point_list[2]
+            # key_points = key_point_list[1]
+            # start_point = key_point_list[0]
+            # end_point = key_point_list[2]
 
-            if eval_mode:
-                if start_point.shape == (1, 2):
-                    result_full[constants.KEYPOINT_START_KEY] = {
-                        'x': start_point[0][0],
-                        'y': start_point[0][1]
-                    }
-                else:
-                    result_full[constants.KEYPOINT_START_KEY] = constants.FAILED
-                if end_point.shape == (1, 2):
-                    result_full[constants.KEYPOINT_END_KEY] = {
-                        'x': end_point[0][0],
-                        'y': end_point[0][1]
-                    }
-                else:
-                    result_full[constants.KEYPOINT_END_KEY] = constants.FAILED
-                result_full[constants.KEYPOINT_NOTCH_KEY] = []
-                for point in key_points:
-                    result_full[constants.KEYPOINT_NOTCH_KEY].append({
-                        'x': point[0],
-                        'y': point[1]
-                    })
+            # if eval_mode:
+            #     if start_point.shape == (1, 2):
+            #         result_full[constants.KEYPOINT_START_KEY] = {
+            #             'x': start_point[0][0],
+            #             'y': start_point[0][1]
+            #         }
+            #     else:
+            #         result_full[constants.KEYPOINT_START_KEY] = constants.FAILED
+            #     if end_point.shape == (1, 2):
+            #         result_full[constants.KEYPOINT_END_KEY] = {
+            #             'x': end_point[0][0],
+            #             'y': end_point[0][1]
+            #         }
+            #     else:
+            #         result_full[constants.KEYPOINT_END_KEY] = constants.FAILED
+            #     result_full[constants.KEYPOINT_NOTCH_KEY] = []
+            #     for point in key_points:
+            #         result_full[constants.KEYPOINT_NOTCH_KEY].append({
+            #             'x': point[0],
+            #             'y': point[1]
+            #         })
 
-            if debug:
-                plotter.plot_heatmaps(heatmaps)
-                plotter.plot_key_points(key_point_list)
+            # if debug:
+            #     plotter.plot_heatmaps(heatmaps)
+            #     plotter.plot_key_points(key_point_list)
 
-            logging.info("Finish key point detection")
+            # logging.info("Finish key point detection")
 
-            # ------------------Ellipse Fitting-------------------------
+            # # ------------------Ellipse Fitting-------------------------
 
-            if debug:
-                print("-------------------")
-                print("Ellipse Fitting")
+            # if debug:
+            #     print("-------------------")
+            #     print("Ellipse Fitting")
 
-            logging.info("Start ellipse fitting")
+            # logging.info("Start ellipse fitting")
 
-            try:
-                coeffs = fit_ellipse(key_points[:, 0], key_points[:, 1])
-                ellipse_params = cart_to_pol(coeffs)
-            except :
-                logging.error("Ellipse parameters not an ellipse.")
-                errors[constants.NOT_AN_ELLIPSE_ERROR_KEY] = True
-                result.append({
-                    constants.ID_KEY: constants.ID_FAILED,
-                    constants.READING_KEY: constants.READING_FAILED,
-                    constants.MEASURE_UNIT_KEY: constants.FAILED
-                })
-                result_full[constants.OCR_NUM_KEY] = constants.FAILED
-                result_full[constants.NEEDLE_MASK_KEY] = constants.FAILED
-                write_files(result, result_full, errors, run_path, eval_mode)
-                raise Exception("Ellipse parameters not an ellipse")
+            # try:
+            #     coeffs = fit_ellipse(key_points[:, 0], key_points[:, 1])
+            #     ellipse_params = cart_to_pol(coeffs)
+            # except :
+            #     logging.error("Ellipse parameters not an ellipse.")
+            #     errors[constants.NOT_AN_ELLIPSE_ERROR_KEY] = True
+            #     result.append({
+            #         constants.ID_KEY: constants.ID_FAILED,
+            #         constants.READING_KEY: constants.READING_FAILED,
+            #         constants.MEASURE_UNIT_KEY: constants.FAILED
+            #     })
+            #     result_full[constants.OCR_NUM_KEY] = constants.FAILED
+            #     result_full[constants.NEEDLE_MASK_KEY] = constants.FAILED
+            #     write_files(result, result_full, errors, run_path, eval_mode)
+            #     raise Exception("Ellipse parameters not an ellipse")
 
-            ellipse_error = get_ellipse_error(key_points, ellipse_params)
-            errors["Ellipse fit error"] = ellipse_error
+            # ellipse_error = get_ellipse_error(key_points, ellipse_params)
+            # errors["Ellipse fit error"] = ellipse_error
 
-            if debug:
-                plotter.plot_ellipse(key_points, ellipse_params, 'key_points')
+            # if debug:
+            #     plotter.plot_ellipse(key_points, ellipse_params, 'key_points')
 
-            logging.info("Finish ellipse fitting")
+            # logging.info("Finish ellipse fitting")
 
-            # calculate zero point
+            # # calculate zero point
 
-            # Find bottom point to set there the zero for wrap around
-            if WRAP_AROUND_FIX and start_point.shape == (1, 2) \
-                and end_point.shape == (1, 2):
-                theta_start = get_polar_angle(start_point.flatten(), ellipse_params)
-                theta_end = get_polar_angle(end_point.flatten(), ellipse_params)
-                theta_zero = get_theta_middle(theta_start, theta_end)
-            else:
-                bottom_middle = np.array((RESOLUTION[0] / 2, RESOLUTION[1]))
-                theta_zero = get_polar_angle(bottom_middle, ellipse_params)
+            # # Find bottom point to set there the zero for wrap around
+            # if WRAP_AROUND_FIX and start_point.shape == (1, 2) \
+            #     and end_point.shape == (1, 2):
+            #     theta_start = get_polar_angle(start_point.flatten(), ellipse_params)
+            #     theta_end = get_polar_angle(end_point.flatten(), ellipse_params)
+            #     theta_zero = get_theta_middle(theta_start, theta_end)
+            # else:
+            #     bottom_middle = np.array((RESOLUTION[0] / 2, RESOLUTION[1]))
+            #     theta_zero = get_polar_angle(bottom_middle, ellipse_params)
 
-            zero_point = get_point_from_angle(theta_zero, ellipse_params)
-            if debug:
-                plotter.plot_zero_point_ellipse(np.array(zero_point),
-                                                np.vstack((start_point, end_point)),
-                                                ellipse_params)
+            # zero_point = get_point_from_angle(theta_zero, ellipse_params)
+            # if debug:
+            #     plotter.plot_zero_point_ellipse(np.array(zero_point),
+            #                                     np.vstack((start_point, end_point)),
+            #                                     ellipse_params)
 
             # ------------------Segmentation-------------------------
             
@@ -328,106 +334,106 @@ def process_image(image, detection_model_path, key_point_model_path,
 
             # ------------------Project Needle to ellipse-------------------------
 
-            point_needle_ellipse = get_line_ellipse_point(
-                needle_line_coeffs, (needle_line_start_x, needle_line_end_x),
-                ellipse_params)
+            # point_needle_ellipse = get_line_ellipse_point(
+            #     needle_line_coeffs, (needle_line_start_x, needle_line_end_x),
+            #     ellipse_params)
 
-            if point_needle_ellipse.shape[0] == 0:
-                print("Needle line and ellipse do not intersect!")
-                logging.error("Needle line and ellipse do not intersect!")
-                errors[constants.OCR_NONE_DETECTED_KEY] = True
-                result.append({
-                    constants.ID_KEY: constants.ID_FAILED,
-                    constants.READING_KEY: constants.READING_FAILED,
-                    constants.MEASURE_UNIT_KEY: constants.FAILED
-                })
-                write_files(result, result_full, errors, run_path, eval_mode)
-                raise Exception("Needle line and ellipse do not intersect")
+            # if point_needle_ellipse.shape[0] == 0:
+            #     print("Needle line and ellipse do not intersect!")
+            #     logging.error("Needle line and ellipse do not intersect!")
+            #     errors[constants.OCR_NONE_DETECTED_KEY] = True
+            #     result.append({
+            #         constants.ID_KEY: constants.ID_FAILED,
+            #         constants.READING_KEY: constants.READING_FAILED,
+            #         constants.MEASURE_UNIT_KEY: constants.FAILED
+            #     })
+            #     write_files(result, result_full, errors, run_path, eval_mode)
+            #     raise Exception("Needle line and ellipse do not intersect")
 
-            if debug:
-                plotter.plot_ellipse(point_needle_ellipse.reshape(1, 2),
-                                    ellipse_params, 'needle_point')
+            # if debug:
+            #     plotter.plot_ellipse(point_needle_ellipse.reshape(1, 2),
+            #                         ellipse_params, 'needle_point')
             
             # ------------------Fit line to angles and get reading of needle-------------------------
 
-            # Find angle of needle ellipse point
-            needle_angle = get_polar_angle(point_needle_ellipse, ellipse_params)
+            # # Find angle of needle ellipse point
+            # needle_angle = get_polar_angle(point_needle_ellipse, ellipse_params)
 
-            angle_converter = AngleConverter(theta_zero)
+            # angle_converter = AngleConverter(theta_zero)
 
-            try:
-                # Find the gauge index from the bounding box
-                gauge_index = metadata.get_gauge_details(box)  
+            # try:
+            #     # Find the gauge index from the bounding box
+            #     gauge_index = metadata.get_gauge_details(box)  
 
-                # Extract units from the metadata
-                unit = metadata.meter_config[gauge_index]['unit']
+            #     # Extract units from the metadata
+            #     unit = metadata.meter_config[gauge_index]['unit']
 
-                # Extract id from metadata
-                id = metadata.meter_config[gauge_index]['id']
+            #     # Extract id from metadata
+            #     id = metadata.meter_config[gauge_index]['id']
 
-                if debug:
-                    print(f"Gauge Index: {gauge_index}")
+            #     if debug:
+            #         print(f"Gauge Index: {gauge_index}")
 
-                # make list of start and end angles along with values
-                angle_number_list = [(angle_converter.convert_angle(theta_start), metadata.meter_config[gauge_index]['start']), 
-                                        (angle_converter.convert_angle(theta_end), metadata.meter_config[gauge_index]['end'])]
+            #     # make list of start and end angles along with values
+            #     angle_number_list = [(angle_converter.convert_angle(theta_start), metadata.meter_config[gauge_index]['start']), 
+            #                             (angle_converter.convert_angle(theta_end), metadata.meter_config[gauge_index]['end'])]
                 
-                if debug:
-                    print(f"Angle Number List: {angle_number_list}")
+            #     if debug:
+            #         print(f"Angle Number List: {angle_number_list}")
                 
-                angle_number_arr = np.array(angle_number_list)
+            #     angle_number_arr = np.array(angle_number_list)
 
-                if RANSAC:
-                    reading_line_coeff, inlier_mask, outlier_mask = line_fit_ransac(
-                        angle_number_arr[:, 0], angle_number_arr[:, 1])
-                else:
-                    reading_line_coeff = line_fit(angle_number_arr[:, 0],
-                                                angle_number_arr[:, 1])
+            #     if RANSAC:
+            #         reading_line_coeff, inlier_mask, outlier_mask = line_fit_ransac(
+            #             angle_number_arr[:, 0], angle_number_arr[:, 1])
+            #     else:
+            #         reading_line_coeff = line_fit(angle_number_arr[:, 0],
+            #                                     angle_number_arr[:, 1])
 
-                reading_line = np.poly1d(reading_line_coeff)
-                reading_line_res = np.sum(
-                    abs(
-                        np.polyval(reading_line_coeff, angle_number_arr[:, 0]) -
-                        angle_number_arr[:, 0]))
-                reading_line_mean_err = reading_line_res / len(angle_number_arr)
-                errors["Mean residual on fitted angle line"] = reading_line_mean_err
+            #     reading_line = np.poly1d(reading_line_coeff)
+            #     reading_line_res = np.sum(
+            #         abs(
+            #             np.polyval(reading_line_coeff, angle_number_arr[:, 0]) -
+            #             angle_number_arr[:, 0]))
+            #     reading_line_mean_err = reading_line_res / len(angle_number_arr)
+            #     errors["Mean residual on fitted angle line"] = reading_line_mean_err
 
-                needle_angle_conv = angle_converter.convert_angle(needle_angle)
+            #     needle_angle_conv = angle_converter.convert_angle(needle_angle)
 
-                reading = reading_line(needle_angle_conv)
+            #     reading = reading_line(needle_angle_conv)
 
-                result.append({
-                    constants.ID_KEY: id,
-                    constants.READING_KEY: reading,
-                    constants.MEASURE_UNIT_KEY: unit
-                })
+            #     result.append({
+            #         constants.ID_KEY: id,
+            #         constants.READING_KEY: reading,
+            #         constants.MEASURE_UNIT_KEY: unit
+            #     })
 
-                if debug:
-                    if RANSAC:
-                        plotter.plot_linear_fit_ransac(angle_number_arr,
-                                                    (needle_angle_conv, reading),
-                                                    reading_line, inlier_mask,
-                                                    outlier_mask)
-                    else:
-                        plotter.plot_linear_fit(angle_number_arr,
-                                                (needle_angle_conv, reading), reading_line)
+            #     if debug:
+            #         if RANSAC:
+            #             plotter.plot_linear_fit_ransac(angle_number_arr,
+            #                                         (needle_angle_conv, reading),
+            #                                         reading_line, inlier_mask,
+            #                                         outlier_mask)
+            #         else:
+            #             plotter.plot_linear_fit(angle_number_arr,
+            #                                     (needle_angle_conv, reading), reading_line)
 
-                    print(f"Final reading is: {id} {reading} {unit}")
-                    plotter.plot_final_reading_ellipse([], point_needle_ellipse,
-                                                    round(reading, 1), ellipse_params)
+            #         print(f"Final reading is: {id} {reading} {unit}")
+            #         plotter.plot_final_reading_ellipse([], point_needle_ellipse,
+            #                                         round(reading, 1), ellipse_params)
 
-                # ------------------Write result to file-------------------------
-                if debug:
-                    write_files(result, result_full, errors, run_path, eval_mode)
+            #     # ------------------Write result to file-------------------------
+            #     if debug:
+            #         write_files(result, result_full, errors, run_path, eval_mode)
             
-            except Exception as err:
-                err_msg = f"Unexpected {err=}, {type(err)=}"
-                print(err_msg)
-                result.append({
-                    constants.ID_KEY: constants.ID_FAILED,
-                    constants.READING_KEY: constants.READING_FAILED,
-                    constants.MEASURE_UNIT_KEY: constants.FAILED
-                })
+            # except Exception as err:
+            #     err_msg = f"Unexpected {err=}, {type(err)=}"
+            #     print(err_msg)
+            #     result.append({
+            #         constants.ID_KEY: constants.ID_FAILED,
+            #         constants.READING_KEY: constants.READING_FAILED,
+            #         constants.MEASURE_UNIT_KEY: constants.FAILED
+            #     })
 
         except Exception as err:
                 err_msg = f"Unexpected {err=}, {type(err)=}"

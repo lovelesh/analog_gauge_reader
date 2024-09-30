@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from gauge_detection.detection_inference import detection_gauge_face, find_center_bbox
+from gauge_detection.detection_inference_edgetpu import detection_gauge_face, find_center_bbox
 import metadata
 from easygui import *
 import json
@@ -126,28 +126,36 @@ def main():
 
         # Show the frame 
         if success:
+            frame = cv2.resize(frame, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
+            print(f"original image size: {frame.shape}")
             image = np.asarray(frame)
             all_boxes = detection_gauge_face(image, model_path='models/gauge_detection_model_custom_trained_saved_model_640/gauge_detection_model_custom_trained_full_integer_quant_edgetpu.tflite', conf=0.25)
-            # for r in results:
-            #     print(r.boxes)
-            
+            # for box in all_boxes:
+            #     print(box)
+            # print(all_boxes)
             for index, box in enumerate(all_boxes):
-                # print(f"x: {box[0]} y: {box[1]}, x: {box[2]}, y: {box[3]}")
-                cv2.rectangle(frame, (int(box[0]), int(box[1])),
-                            (int(box[2]), int(box[3])), box_color, box_thickness)
+                x1, y1, x2, y2, cls_id = box
+                cls_id = int(cls_id)
+                print(cls_id)
+                # print(type(x1))
+                # x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                # print(type(x1))
+                print(f"x: {int(x1)} y: {int(y1)}, x: {int(x2)}, y: {int(y2)}")
+                cv2.rectangle(frame, (int(x1), int(y1)),
+                            (int(x2), int(y2)), box_color, box_thickness)
                 
                 # print(type(meter_config[index]['center'][0]))
                 # print(meter_config[index]['center'])
                 # x = tuple(meter_config[index]['center'])
                 # print(f"Center : {find_center_bbox(box)}")
-                try: 
-                    gauge_index = metadata.get_gauge_details(box)
-                    print(f"Gauge Details: {gauge_index} {metadata.meter_config[gauge_index]}")
-                    cv2.putText(frame, f"#{index} #{metadata.meter_config[gauge_index]['id']} {metadata.meter_config[gauge_index]['name']} {metadata.meter_config[gauge_index]['end']} {metadata.meter_config[gauge_index]['unit']}",
-                                find_center_bbox(box), font, font_scale, text_color, text_thickness)
+                # try: 
+                #     gauge_index = metadata.get_gauge_details(box)
+                #     print(f"Gauge Details: {gauge_index} {metadata.meter_config[gauge_index]}")
+                #     cv2.putText(frame, f"#{index} {conf:.2f} #{metadata.meter_config[gauge_index]['id']} {metadata.meter_config[gauge_index]['name']} {metadata.meter_config[gauge_index]['end']} {metadata.meter_config[gauge_index]['unit']}",
+                #                 find_center_bbox(box), font, font_scale, text_color, text_thickness)
                     
-                except :
-                    pass
+                # except :
+                #     pass
 
             # Set callback for mouse events
             cv2.namedWindow(WINDOW_NAME)
