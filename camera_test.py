@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
-from gauge_detection.detection_inference import detection_gauge_face, find_center_bbox
+from gauge_detection.detection_inference_onnx import detection_gauge_face, find_center_bbox
 import metadata
-from easygui import *
+# from easygui import *
 import json
 import os
 import subprocess
@@ -138,10 +138,10 @@ def main():
     # command = f"v4l2-ctl --list-devices | grep '{CAMERA_NAME}' -A4 | sed -n '2p' | xargs"
     # index = subprocess.getstatusoutput(command)[1]
     # print(f"index is {index}")
-    index = 0
-    cap = cv2.VideoCapture(index)
-    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
-    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
+    camera_index = 2
+    cap = cv2.VideoCapture(camera_index)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1600)
     cap.set(cv2.CAP_PROP_POS_FRAMES, 20)
     cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -158,12 +158,12 @@ def main():
         # print(f"Focus: {focus_value}")
         # print(f"zoom : {zoom_value}")
         # cap.set(cv2.CAP_PROP_ZOOM, zoom_value) 
-        success, frame_out = cap.read()        
-        frame = autoAdjustments(frame_out)
+        success, frame = cap.read()        
+        # frame = autoAdjustments(frame_out)
 
-        [frame, alpha, beta] = autoAdjustments_with_convertScaleAbs(frame_out)
+        # [frame, alpha, beta] = autoAdjustments_with_convertScaleAbs(frame_out)
 
-        print(f"aplha: {alpha}, beta: {beta}")
+        # print(f"aplha: {alpha}, beta: {beta}")
 
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.8
@@ -174,20 +174,20 @@ def main():
 
         # Show the frame 
         if success:
-            image = np.asarray(frame)
-            all_boxes = detection_gauge_face(image, model_path='models/gauge_detection_model_custom_trained.onnx', conf=0.25)
+            # image = np.asarray(frame)
+            all_boxes = detection_gauge_face(frame, model_path='models/gauge_detection_model_custom_trained.onnx', conf=0.25)
             # for r in results:
             #     print(r.boxes)
             
             for index, box in enumerate(all_boxes):
-                # print(f"x: {box[0]} y: {box[1]}, x: {box[2]}, y: {box[3]}")
+                print(f"x: {box[0]} y: {box[1]}, x: {box[2]}, y: {box[3]}")
                 cv2.rectangle(frame, (int(box[0]), int(box[1])),
                             (int(box[2]), int(box[3])), box_color, box_thickness)
                 
                 # print(type(meter_config[index]['center'][0]))
                 # print(meter_config[index]['center'])
                 # x = tuple(meter_config[index]['center'])
-                # print(f"Center : {find_center_bbox(box)}")
+                print(f"Center : {find_center_bbox(box)}")
                 try: 
                     gauge_index = metadata.get_gauge_details(box)
                     print(f"Gauge Details: {gauge_index} {metadata.meter_config[gauge_index]}")
@@ -213,11 +213,11 @@ def main():
             
             elif key == ord('s'):
                 print(f"Saving METER Data: {metadata.meter_config}")
-                write_json_file(metadata_path, metadata.meter_config)
+                metadata.write_metadata(camera_index, metadata.meter_config, metadata_path)
 
             elif key == ord('o'):
-                metadata.meter_config = read_json_file(metadata_path)
-                print(f"Read METER Data: {metadata.meter_config}")
+                index, metadata.meter_config = metadata.read_metadata(metadata_path)
+                print(f"Read Metadata: {metadata.meter_config}")
             
             elif key == ord('q'):
                 break

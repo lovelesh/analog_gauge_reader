@@ -44,8 +44,8 @@ ZERO_POINT_ROTATION = True
 OCR_ROTATION = RANDOM_ROTATIONS or ZERO_POINT_ROTATION
 
 WINDOW_NAME = "Gauge Reading"
-CAMERA_NAME = "HD USB Camera"
-# CAMERA_NAME = "HD Pro Webcam"
+# CAMERA_NAME = "HD USB Camera"
+CAMERA_NAME = "HD Pro Webcam"
 
 MAX_ITERATIONS = 3
 avg_gauge_readings = []
@@ -649,7 +649,7 @@ def main():
         if args.debug:
             wait_time = 0   # for user interactive mechanism
         else:
-            wait_time = 20 # for automatic running
+            wait_time = 20  # for automatic running
             
         if args.debug:
             # Set callback for mouse events

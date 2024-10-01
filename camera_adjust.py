@@ -87,7 +87,7 @@ def read_args():
     parser.add_argument('--detection_model',
                         type=str,
                         required=False,
-                        default="models/gauge_detection_model_custom_trained.onnx",
+                        default=MODEL_PATH,
                         help="Path to detection model")
     parser.add_argument('--camera_id',
                         type=str,
